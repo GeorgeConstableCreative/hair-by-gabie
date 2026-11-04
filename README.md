@@ -12,7 +12,8 @@ Designed for iPhone: open the link in Safari, then Share → **Add to Home Scree
 
 ## Files
 - `index.html`: the whole game in one file (no build step needed)
-- `gabie-christmas-qr.png`: printable Christmas card with a QR code that opens the game
+- `gabie-christmas-qr.png`: printable Christmas gift-tag card with a QR code that opens the game (print about 4×6 in)
+- `hair-by-gabie-qr-plain.png`: plain black-and-white QR code, the safest to scan when printed small
 - `.nojekyll`: tells GitHub Pages to serve the files as they are
 
 ## Publish with GitHub Pages

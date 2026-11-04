@@ -3185,7 +3185,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v114';
+const GAME_VERSION = 'v115';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -5729,7 +5729,7 @@ ARC_PREVIEW.inv = function (x, y, w, h) {
    music and your taps all agree, even on phones with laggy speakers or Bluetooth headphones. */
 const JJ = {
   BPM: 66, TRAVEL: 5, LEAD: 3,
-  WIN: { perfect: .08, great: .15, good: .22 },
+  WIN: { perfect: .08, great: .15, good: .22, early: .42 }, // early: you can tap a little ahead of the line and still play the note
   MINGAP: 2, // the chart only uses notes at least this many eighth-notes apart, so no rapid-fire runs
   COLS: ['#ff4a55', '#ffc928', '#2fd37a', '#3d8bff'],
   KEYS: [['d', '1', 'arrowleft'], ['f', '2', 'arrowdown'], ['j', '3', 'arrowup'], ['k', '4', 'arrowright']],
@@ -5800,7 +5800,7 @@ SCENES.beats = {
   press(l) {
     const st = this.st; if (st.ph !== 'play') return;
     st.laneFx[l] = 1; const now = this.now();
-    let best = null; for (const n of st.notes) { if (n.hit || n.lane !== l) continue; const d = n.t - now; if (Math.abs(d) <= JJ.WIN.good && (!best || Math.abs(d) < Math.abs(best.t - now))) best = n; if (d > JJ.WIN.good) break; }
+    let best = null; for (const n of st.notes) { if (n.hit || n.lane !== l) continue; const d = n.t - now; if (d <= JJ.WIN.early && d >= -JJ.WIN.good && (!best || Math.abs(d) < Math.abs(best.t - now))) best = n; if (d > JJ.WIN.early) break; }
     if (!best) { st.streak = 0; st.cheer = Math.max(0, st.cheer - .015); return; } // a stray tap: no penalty beyond breaking the streak
     const err = Math.abs(best.t - now), grade = err <= JJ.WIN.perfect ? 'perfect' : err <= JJ.WIN.great ? 'great' : 'good';
     best.hit = grade; st.counts[grade]++; st.streak++; st.best = Math.max(st.best, st.streak);
@@ -5828,7 +5828,7 @@ SCENES.beats = {
   },
   // ---- layout: a stage with four lanes in gentle perspective ----
   geo() {
-    const GA = arcadeGA(), cx = GA.x + GA.w / 2, lwB = Math.min(GA.w * .2, 110), topY = GA.y + 56, hitY = GA.y + GA.h - Math.min(90, GA.h * .16);
+    const GA = PORT ? { x: 14, y: SAFE.t + 76, w: W - 28, h: H - SAFE.t - SAFE.b - 76 - 64, port: true } : arcadeGA(), cx = GA.x + GA.w / 2, lwB = Math.min(GA.w * .21, 120), topY = GA.y + 44, hitY = GA.y + GA.h - Math.min(84, GA.h * .11);
     return { GA, cx, lwB, lwT: lwB * .5, topY, hitY };
   },
   lw(g, y) { return lerp(g.lwT, g.lwB, clamp((y - g.topY) / (g.hitY - g.topY), 0, 1.2)); },
@@ -5846,15 +5846,38 @@ SCENES.beats = {
       for (const [sx, col] of [[GA.x + GA.w * .12, '255,90,200'], [GA.x + GA.w * .88, '90,200,255']]) { const sg = ctx.createRadialGradient(sx, GA.y, 0, sx, GA.y, GA.h * .9); sg.addColorStop(0, 'rgba(' + col + ',' + (.18 + pulse * .2) + ')'); sg.addColorStop(1, 'rgba(' + col + ',0)'); ctx.fillStyle = sg; ctx.fillRect(GA.x, GA.y, GA.w, GA.h); }
       ctx.restore();
       snowfall(GA.x, GA.y, GA.w, GA.h, 30, 9);
-      // the lanes
-      ctx.beginPath(); ctx.moveTo(this.laneX(g, -.5, g.topY), g.topY); ctx.lineTo(this.laneX(g, 3.5, g.topY), g.topY); ctx.lineTo(this.laneX(g, 3.5, g.hitY + 40), g.hitY + 40); ctx.lineTo(this.laneX(g, -.5, g.hitY + 40), g.hitY + 40); ctx.closePath();
-      const lg = ctx.createLinearGradient(0, g.topY, 0, g.hitY); lg.addColorStop(0, 'rgba(255,255,255,.02)'); lg.addColorStop(1, 'rgba(255,255,255,.1)'); ctx.fillStyle = lg; ctx.fill();
-      for (let l = 0; l < 4; l++) {
-        if (st.laneFx[l] > 0) { ctx.save(); ctx.globalAlpha = st.laneFx[l] * .35; ctx.beginPath(); ctx.moveTo(this.laneX(g, l - .5, g.topY), g.topY); ctx.lineTo(this.laneX(g, l + .5, g.topY), g.topY); ctx.lineTo(this.laneX(g, l + .5, g.hitY), g.hitY); ctx.lineTo(this.laneX(g, l - .5, g.hitY), g.hitY); ctx.closePath(); ctx.fillStyle = JJ.COLS[l]; ctx.fill(); ctx.restore(); }
+      // the fretboard: a rosewood guitar neck in perspective with binding, pearl inlays, frets that scroll with the beat,
+      // and four strings (one per lane) that shimmer when you play them
+      { const L = l => this.laneX(g, l, g.topY), R = l => this.laneX(g, l, g.hitY + 60), yb = g.hitY + 60;
+        ctx.beginPath(); ctx.moveTo(L(-.62), g.topY); ctx.lineTo(L(3.62), g.topY); ctx.lineTo(R(3.62), yb); ctx.lineTo(R(-.62), yb); ctx.closePath();
+        const wood = ctx.createLinearGradient(0, g.topY, 0, yb); wood.addColorStop(0, '#1e120c'); wood.addColorStop(.5, '#3a2416'); wood.addColorStop(1, '#4e301c'); ctx.fillStyle = wood; ctx.fill();
+        // wood grain
+        ctx.save(); ctx.clip(); ctx.globalAlpha = .18; for (let k = 0; k < 14; k++) { const f = (k + .5) / 14 * 4.24 - .62; ctx.beginPath(); ctx.moveTo(L(f), g.topY); ctx.quadraticCurveTo(lerp(L(f), R(f), .5) + Math.sin(k * 2.3) * 6, (g.topY + yb) / 2, R(f), yb); strokeP(ctx, k % 2 ? '#6e4426' : '#140a06', 1.2); } ctx.restore();
+        // binding along both edges
+        for (const e of [-.62, 3.62]) { line(ctx, L(e), g.topY, R(e), yb, '#f2e6cc', 4); line(ctx, L(e), g.topY, R(e), yb, 'rgba(0,0,0,.35)', 1); }
+        // lane glow when tapped
+        for (let l = 0; l < 4; l++) if (st.laneFx[l] > 0) { ctx.save(); ctx.globalAlpha = st.laneFx[l] * .3; ctx.beginPath(); ctx.moveTo(this.laneX(g, l - .5, g.topY), g.topY); ctx.lineTo(this.laneX(g, l + .5, g.topY), g.topY); ctx.lineTo(this.laneX(g, l + .5, g.hitY), g.hitY); ctx.lineTo(this.laneX(g, l - .5, g.hitY), g.hitY); ctx.closePath(); ctx.fillStyle = JJ.COLS[l]; ctx.fill(); ctx.restore(); }
+        // frets: nickel wires on each beat, scrolling toward you; every third gets pearl dot inlays
+        const per = jjStep() * 2;
+        for (let b = Math.ceil((now - .3) / per); b * per < now + JJ.TRAVEL; b++) {
+          const y = g.hitY - (b * per - now) / JJ.TRAVEL * (g.hitY - g.topY); if (y < g.topY || y > yb) continue;
+          const k = clamp((y - g.topY) / (g.hitY - g.topY), 0, 1.2), x0 = this.laneX(g, -.62, y), x1 = this.laneX(g, 3.62, y), th = 1.5 + k * 3;
+          ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(x0, y + th * .5, x1 - x0, th * .6);
+          const fg = ctx.createLinearGradient(0, y - th / 2, 0, y + th / 2); fg.addColorStop(0, '#f4f6f8'); fg.addColorStop(1, '#8a9098'); ctx.fillStyle = fg; ctx.fillRect(x0, y - th / 2, x1 - x0, th);
+          if (b % 3 === 1) { const yy = y + (g.hitY - g.topY) / JJ.TRAVEL * per * .5, dr = 2 + this.lw(g, yy) * .05; for (const lx of b % 12 === 1 ? [.5, 2.5] : [1.5]) { const ix = this.laneX(g, lx, yy); circ(ctx, ix, yy, dr); fillP(ctx, 'rgba(240,235,225,.85)'); } }
+        }
+        // strings: thick to thin, wound look, shimmer when plucked
+        for (let l = 0; l < 4; l++) {
+          const xt = this.laneX(g, l, g.topY), xb = this.laneX(g, l, yb), wv = st.laneFx[l], sw = 3.6 - l * .6;
+          ctx.save(); ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(xt, g.topY); for (let s = 1; s <= 16; s++) { const f = s / 16; ctx.lineTo(lerp(xt, xb, f) + Math.sin(f * Math.PI * 6 + TT * 60) * wv * 3 * Math.sin(f * Math.PI), lerp(g.topY, yb, f)); }
+          ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = sw + 2; ctx.stroke();
+          ctx.strokeStyle = wv > 0 ? mixToHex('#e8d9b0', JJ.COLS[l], wv) : (l < 2 ? '#d9c08a' : '#e8eaee'); ctx.lineWidth = sw; ctx.stroke();
+          ctx.globalAlpha = .5; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = sw * .3; ctx.stroke(); ctx.restore();
+        }
+        // the strike line the tools land on
+        line(ctx, this.laneX(g, -.62, g.hitY), g.hitY, this.laneX(g, 3.62, g.hitY), g.hitY, 'rgba(255,255,255,.35)', 2);
       }
-      for (let l = 0; l <= 4; l++) line(ctx, this.laneX(g, l - .5, g.topY), g.topY, this.laneX(g, l - .5, g.hitY + 40), g.hitY + 40, 'rgba(255,255,255,.18)', 1.5);
-      // beat lines scrolling down with the music
-      if (now > -JJ.LEAD) for (let b = Math.ceil((now - .2) / (jjStep() * 2)); b * jjStep() * 2 < now + JJ.TRAVEL; b++) { const y = g.hitY - (b * jjStep() * 2 - now) / JJ.TRAVEL * (g.hitY - g.topY); if (y < g.topY) continue; line(ctx, this.laneX(g, -.5, y), y, this.laneX(g, 3.5, y), y, b % 3 === 0 ? 'rgba(255,255,255,.22)' : 'rgba(255,255,255,.08)', b % 3 === 0 ? 2 : 1); }
       // hit targets: big, chunky arcade buttons you can tap (or press D F J K)
       for (let l = 0; l < 4; l++) {
         const x = this.laneX(g, l, g.hitY), r = g.lwB * .42, down = Object.values(st.held).includes(l) || st.laneFx[l] > .75, c = JJ.COLS[l], dy = down ? 4 : 0;
@@ -5864,7 +5887,6 @@ SCENES.beats = {
         circ(ctx, x, g.hitY + dy, r * (down ? .96 : 1)); ctx.fillStyle = bgr; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.stroke();
         circ(ctx, x, g.hitY + dy, r * .62); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.stroke();
         ell(ctx, x - r * .32, g.hitY - r * .42 + dy, r * .3, r * .16, -.5); fillP(ctx, 'rgba(255,255,255,.55)');
-        text(ctx, FINE_POINTER ? JJ.LABEL[l] : '♪', x, g.hitY + dy + 1, { size: Math.round(r * .55), weight: 700, color: '#ffffff', stroke: shade(c, -.45), sw: 4 });
         if (st.laneFx[l] > 0) { circ(ctx, x, g.hitY, r * (1 + (1 - st.laneFx[l]) * .7)); ctx.globalAlpha = st.laneFx[l]; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.globalAlpha = 1; }
       }
       // the notes: Christmas baubles
@@ -5887,7 +5909,7 @@ SCENES.beats = {
       if (st.ph === 'play' && now < 12 * jjStep()) { const c = 4 - Math.floor(Math.max(0, now + JJ.LEAD) / (jjStep() * 3)); if (now > -JJ.LEAD + .2) { const cj = jiggle(((now + JJ.LEAD) % (jjStep() * 3)), c); ctx.save(); ctx.translate(g.cx, GA.y + GA.h * .4); ctx.scale(cj.sx, cj.sy); text(ctx, now < 0 ? 'GET READY' : 'HERE WE GO!', 0, 0, { size: 16, font: PIXEL, weight: 400, color: '#ffd34d', stroke: '#120a2a', sw: 6 }); ctx.restore(); } }
       if (st.ph === 'ready') readyOverlay(GA, 'JINGLE JAM', ['Hit the salon tools on the line.', 'Keep the streak going!']);
     });
-    controls('beats');
+    controls('beats', g.GA);
     if (st.ph === 'over') arcadeEnd(st, 'beats', false, ['The crowd went home early.', 'Score: ' + st.score]);
     if (st.ph === 'win') arcadeEnd(st, 'beats', true, ['Accuracy ' + Math.round((st.acc || 0) * 100) + '%  ·  Best streak ' + st.best, 'Score: ' + st.score]);
   }

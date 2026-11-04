@@ -3185,7 +3185,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v116';
+const GAME_VERSION = 'v117';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -5797,10 +5797,12 @@ SCENES.beats = {
     if (this.st.ph === 'ready') { this.begin(); return; }
     this.st.held['k' + l] = l; this.press(l);
   },
+  // the next fret line still above the button: a tool that has slid past it can be tapped and played
+  zoneEnd(now) { const per = jjStep() * 2; return Math.ceil((now + .001) / per) * per; },
   press(l) {
     const st = this.st; if (st.ph !== 'play') return;
-    st.laneFx[l] = 1; const now = this.now();
-    let best = null; for (const n of st.notes) { if (n.hit || n.lane !== l) continue; const d = n.t - now; if (d <= JJ.WIN.early && d >= -JJ.WIN.good && (!best || Math.abs(d) < Math.abs(best.t - now))) best = n; if (d > JJ.WIN.early) break; }
+    st.laneFx[l] = 1; const now = this.now(), early = Math.max(JJ.WIN.good, this.zoneEnd(now) - now + .04);
+    let best = null; for (const n of st.notes) { if (n.hit || n.lane !== l) continue; const d = n.t - now; if (d <= early && d >= -JJ.WIN.good && (!best || Math.abs(d) < Math.abs(best.t - now))) best = n; if (d > early) break; }
     if (!best) { st.streak = 0; st.cheer = Math.max(0, st.cheer - .015); return; } // a stray tap: no penalty beyond breaking the streak
     const err = Math.abs(best.t - now), grade = err <= JJ.WIN.perfect ? 'perfect' : err <= JJ.WIN.great ? 'great' : 'good';
     best.hit = grade; st.counts[grade]++; st.streak++; st.best = Math.max(st.best, st.streak);
@@ -5869,7 +5871,9 @@ SCENES.beats = {
           const y = g.hitY - (b * per - now) / (st.travel || JJ.TRAVEL) * (g.hitY - g.topY); if (y < g.topY || y > yb) continue;
           const k = clamp((y - g.topY) / (g.hitY - g.topY), 0, 1.2), x0 = this.laneX(g, -.62, y), x1 = this.laneX(g, 3.62, y), th = 1.5 + k * 3;
           ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(x0, y + th * .5, x1 - x0, th * .6);
-          const fg = ctx.createLinearGradient(0, y - th / 2, 0, y + th / 2); fg.addColorStop(0, '#f4f6f8'); fg.addColorStop(1, '#8a9098'); ctx.fillStyle = fg; ctx.fillRect(x0, y - th / 2, x1 - x0, th);
+          const zone = st.ph === 'play' && Math.abs(b * per - this.zoneEnd(now)) < .001;
+          if (zone) { ctx.save(); ctx.globalAlpha = .25; ctx.fillStyle = '#ffd34d'; ctx.fillRect(x0, y - th * 2.2, x1 - x0, th * 4.4); ctx.restore(); }
+          const fg = ctx.createLinearGradient(0, y - th / 2, 0, y + th / 2); fg.addColorStop(0, zone ? '#fff6c8' : '#f4f6f8'); fg.addColorStop(1, zone ? '#e0b44a' : '#8a9098'); ctx.fillStyle = fg; ctx.fillRect(x0, y - th / 2, x1 - x0, th);
           if (b % 3 === 1) { const yy = y + (g.hitY - g.topY) / (st.travel || JJ.TRAVEL) * per * .5, dr = 2 + this.lw(g, yy) * .05; for (const lx of b % 12 === 1 ? [.5, 2.5] : [1.5]) { const ix = this.laneX(g, lx, yy); circ(ctx, ix, yy, dr); fillP(ctx, 'rgba(240,235,225,.85)'); } }
         }
         // strings: thick to thin, wound look, shimmer when plucked

@@ -3378,13 +3378,15 @@ function neonText(str, x, y, font, size, col, lit, align, track) {
   }
   ctx.restore();
 }
+/* neon tube: no additive blending (Safari on iPhone saturates it to white), blur scaled to the real pixel density,
+   and a coloured core instead of a white one, so letters stay crisp and readable on every screen */
 function neonTube(lit, col, lw, path) {
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  path(); ctx.globalAlpha = .35; ctx.strokeStyle = mixToHex(col, '#1a1018', .65); ctx.lineWidth = lw; ctx.stroke();
+  path(); ctx.globalAlpha = .3; ctx.strokeStyle = mixToHex(col, '#1a1018', .65); ctx.lineWidth = lw; ctx.stroke();
   if (lit > 0) {
-    ctx.globalCompositeOperation = 'lighter';
-    for (const [blur, a, wmul] of [[lw * 9, .5, 1.3], [lw * 3.5, .85, 1.1], [lw * 1.2, 1, 1]]) { ctx.globalAlpha = lit * a; ctx.shadowColor = col; ctx.shadowBlur = blur; ctx.strokeStyle = col; ctx.lineWidth = lw * wmul; path(); ctx.stroke(); }
-    ctx.shadowBlur = 0; ctx.globalAlpha = lit; ctx.strokeStyle = mixToHex(col, '#ffffff', .45); ctx.lineWidth = lw * .34; path(); ctx.stroke();
+    ctx.shadowColor = col; ctx.shadowBlur = lw * 3.2 * K; ctx.globalAlpha = lit * .55; ctx.strokeStyle = col; ctx.lineWidth = lw * 1.15; path(); ctx.stroke();
+    ctx.shadowBlur = lw * 1.1 * K; ctx.globalAlpha = lit; ctx.lineWidth = lw; path(); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.globalAlpha = lit * .8; ctx.strokeStyle = mixToHex(col, '#ffffff', .3); ctx.lineWidth = lw * .36; path(); ctx.stroke();
   }
   ctx.restore();
 }
@@ -3774,12 +3776,14 @@ function roundNeonSign(cx, w, t) {
 /* =================== stacked script neon: hollow-tube handwriting, colour shifting line by line (blue → violet → pink → gold) =================== */
 function neonStrokeText(str, x, y, font, size, col, lit) {
   ctx.save(); ctx.font = font; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  const lw = Math.max(2, size * .035);
-  ctx.globalAlpha = .3; ctx.strokeStyle = mixToHex(col, '#1a1018', .7); ctx.lineWidth = lw; ctx.strokeText(str, x, y);
+  const lw = Math.max(2.4, size * .04);
+  // a dark backing line keeps each tube's shape readable against its own glow
+  ctx.globalAlpha = .55; ctx.strokeStyle = 'rgba(20,10,30,.9)'; ctx.lineWidth = lw * 2.1; ctx.strokeText(str, x, y);
+  ctx.globalAlpha = .35; ctx.strokeStyle = mixToHex(col, '#1a1018', .7); ctx.lineWidth = lw; ctx.strokeText(str, x, y);
   if (lit > 0) {
-    ctx.globalCompositeOperation = 'lighter';
-    for (const [blur, a, wm] of [[size * .28, .45, 1.25], [size * .1, .8, 1.1], [size * .03, 1, 1]]) { ctx.globalAlpha = lit * a; ctx.shadowColor = col; ctx.shadowBlur = blur; ctx.strokeStyle = col; ctx.lineWidth = lw * wm; ctx.strokeText(str, x, y); }
-    ctx.shadowBlur = 0; ctx.globalAlpha = lit * .9; ctx.strokeStyle = mixToHex(col, '#ffffff', .4); ctx.lineWidth = lw * .32; ctx.strokeText(str, x, y);
+    ctx.shadowColor = col; ctx.shadowBlur = size * .09 * K; ctx.globalAlpha = lit * .5; ctx.strokeStyle = col; ctx.lineWidth = lw * 1.2; ctx.strokeText(str, x, y);
+    ctx.shadowBlur = size * .03 * K; ctx.globalAlpha = lit; ctx.lineWidth = lw; ctx.strokeText(str, x, y);
+    ctx.shadowBlur = 0; ctx.globalAlpha = lit * .85; ctx.strokeStyle = mixToHex(col, '#ffffff', .3); ctx.lineWidth = lw * .34; ctx.strokeText(str, x, y);
   }
   ctx.restore();
 }
@@ -3794,8 +3798,8 @@ function scriptNeonSign(cx, w, t) {
   const top = SAFE.t + (PORT ? 60 : 38), ys = []; let yy0 = top; lines.forEach((l, i) => { yy0 += base * sizes[i] * (i ? .82 : .8); ys.push(yy0); });
   const s1 = base * sizes[0], s2 = base * sizes[sizes.length - 1], y1 = ys[0], y2 = ys[ys.length - 1], tilt = -.07;
   // soft rainbow wash on the wall behind the sign
-  ctx.save(); ctx.globalCompositeOperation = 'lighter';
-  for (const [f, yy] of [[.15, y1 - s1 * .3], [.55, (y1 + y2) / 2 - s2 * .2], [.85, y2 - s2 * .2]]) { const c = colAt(f), g = ctx.createRadialGradient(cx, yy, 5, cx, yy, w * .5); g.addColorStop(0, c + '30'); g.addColorStop(1, c + '00'); ctx.fillStyle = g; ctx.fillRect(cx - w, yy - w * .6, w * 2, w * 1.2); }
+  ctx.save();
+  for (const [f, yy] of [[.15, y1 - s1 * .3], [.55, (y1 + y2) / 2 - s2 * .2], [.85, y2 - s2 * .2]]) { const c = colAt(f), g = ctx.createRadialGradient(cx, yy, 5, cx, yy, w * .5); g.addColorStop(0, c + '1c'); g.addColorStop(1, c + '00'); ctx.fillStyle = g; ctx.fillRect(cx - w, yy - w * .6, w * 2, w * 1.2); }
   ctx.restore();
   ctx.save(); ctx.translate(cx, (y1 + y2) / 2); ctx.rotate(tilt); ctx.translate(-cx, -(y1 + y2) / 2);
   let n = 0; const total = lines.join('').replace(/ /g, '').length;

@@ -3384,8 +3384,8 @@ function neonTube(lit, col, lw, path) {
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   path(); ctx.globalAlpha = .3; ctx.strokeStyle = mixToHex(col, '#1a1018', .65); ctx.lineWidth = lw; ctx.stroke();
   if (lit > 0) {
-    ctx.shadowColor = col; ctx.shadowBlur = lw * 3.2 * K; ctx.globalAlpha = lit * .55; ctx.strokeStyle = col; ctx.lineWidth = lw * 1.15; path(); ctx.stroke();
-    ctx.shadowBlur = lw * 1.1 * K; ctx.globalAlpha = lit; ctx.lineWidth = lw; path(); ctx.stroke();
+    ctx.strokeStyle = col; for (const [wm, a] of [[5.5, .07], [3.8, .11], [2.5, .2], [1.6, .4]]) { ctx.globalAlpha = lit * a; ctx.lineWidth = lw * wm; path(); ctx.stroke(); }
+    ctx.globalAlpha = lit; ctx.lineWidth = lw; path(); ctx.stroke();
     ctx.shadowBlur = 0; ctx.globalAlpha = lit * .8; ctx.strokeStyle = mixToHex(col, '#ffffff', .3); ctx.lineWidth = lw * .36; path(); ctx.stroke();
   }
   ctx.restore();
@@ -3781,8 +3781,8 @@ function neonStrokeText(str, x, y, font, size, col, lit) {
   ctx.globalAlpha = .55; ctx.strokeStyle = 'rgba(20,10,30,.9)'; ctx.lineWidth = lw * 2.1; ctx.strokeText(str, x, y);
   ctx.globalAlpha = .35; ctx.strokeStyle = mixToHex(col, '#1a1018', .7); ctx.lineWidth = lw; ctx.strokeText(str, x, y);
   if (lit > 0) {
-    ctx.shadowColor = col; ctx.shadowBlur = size * .09 * K; ctx.globalAlpha = lit * .5; ctx.strokeStyle = col; ctx.lineWidth = lw * 1.2; ctx.strokeText(str, x, y);
-    ctx.shadowBlur = size * .03 * K; ctx.globalAlpha = lit; ctx.lineWidth = lw; ctx.strokeText(str, x, y);
+    ctx.strokeStyle = col; for (const [wm, a] of [[4.2, .07], [3, .1], [2, .18], [1.45, .35]]) { ctx.globalAlpha = lit * a; ctx.lineWidth = lw * wm; ctx.strokeText(str, x, y); }
+    ctx.globalAlpha = lit; ctx.lineWidth = lw; ctx.strokeText(str, x, y);
     ctx.shadowBlur = 0; ctx.globalAlpha = lit * .85; ctx.strokeStyle = mixToHex(col, '#ffffff', .3); ctx.lineWidth = lw * .34; ctx.strokeText(str, x, y);
   }
   ctx.restore();

@@ -3185,7 +3185,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v113';
+const GAME_VERSION = 'v114';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -5728,8 +5728,9 @@ ARC_PREVIEW.inv = function (x, y, w, h) {
    "the time you are hearing right now" = audio clock minus the device's output latency. So the picture, the
    music and your taps all agree, even on phones with laggy speakers or Bluetooth headphones. */
 const JJ = {
-  BPM: 80, TRAVEL: 3.6, LEAD: 2.4,
-  WIN: { perfect: .06, great: .115, good: .17 },
+  BPM: 66, TRAVEL: 5, LEAD: 3,
+  WIN: { perfect: .08, great: .15, good: .22 },
+  MINGAP: 2, // the chart only uses notes at least this many eighth-notes apart, so no rapid-fire runs
   COLS: ['#ff4a55', '#ffc928', '#2fd37a', '#3d8bff'],
   KEYS: [['d', '1', 'arrowleft'], ['f', '2', 'arrowdown'], ['j', '3', 'arrowup'], ['k', '4', 'arrowright']],
   LABEL: ['D', 'F', 'J', 'K']
@@ -5750,7 +5751,7 @@ SCENES.beats = {
   pausable: true,
   enter(p) {
     this.lastParams = p; playTrack(null);
-    this.st = { params: p, ph: 'ready', notes: JJ_SONG.notes.map(n => ({ ...n, t: n.step * jjStep(), hit: null })), score: 0, streak: 0, best: 0, cheer: .6, judged: [], laneFx: [0, 0, 0, 0], held: {}, counts: { perfect: 0, great: 0, good: 0, miss: 0 }, nextStep: 0 };
+    this.st = { params: p, ph: 'ready', notes: (() => { let last = -99; return JJ_SONG.notes.filter(n => { if (n.step - last < JJ.MINGAP) return false; last = n.step; return true; }); })().map(n => ({ ...n, t: n.step * jjStep(), hit: null })), score: 0, streak: 0, best: 0, cheer: .6, judged: [], laneFx: [0, 0, 0, 0], held: {}, counts: { perfect: 0, great: 0, good: 0, miss: 0 }, nextStep: 0 };
     this.kh = e => this.rawKey(e, true); this.ku = e => this.rawKey(e, false);
     window.addEventListener('keydown', this.kh, true); window.addEventListener('keyup', this.ku, true);
   },

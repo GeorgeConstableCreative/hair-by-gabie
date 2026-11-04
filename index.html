@@ -3185,6 +3185,7 @@ SCENES.dry = {
   }
 };
 
+const GAME_VERSION = 'v113';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -3206,6 +3207,7 @@ SCENES.title = {
     const sw0 = PORT ? Math.min(W - 40, 540) : Math.min(W * .46, 410), sh0 = sw0 * .47;
     const bottom = scriptNeonSign(W / 2, sw0, sceneT);
     soundBtn();
+    text(ctx, GAME_VERSION, 16 + SAFE.l, SAFE.t + 20, { size: 11, color: 'rgba(255,255,255,.45)', weight: 500, align: 'left' });
     const bw = Math.min(W - 50, 520), by = PORT ? Math.max(bottom + 40, EXTG.lampTop - 20 - 280) : H - SAFE.b - 250;
     if (this.saveSheet) { drawSaveSheet(this.saveSheet, () => { this.saveSheet = null; }); this.saveSheet.t += 1 / 60; return; }
     const reachedI = clamp(save.reached | 0, 0, STAGES.length - 1), cont = reachedI > 0;
@@ -3929,7 +3931,7 @@ function drawGabieExterior(t) {
     og.setTransform(K, 0, 0, K, 0, 0); og.clearRect(0, 0, cw3, ch3);
     drawGabby(og, cw3 / 2, ch3 - 2, gs, { view: 'front', flip: W8.dir < 0, pose: W8.pose, tool: 'scissors', expr: 'smile', t: TT * 1.3, noShadow: true });
     og.globalCompositeOperation = 'source-in'; og.fillStyle = '#2a1c20'; og.fillRect(0, 0, cw3, ch3); og.globalCompositeOperation = 'source-over';
-    g.save(); g.globalAlpha = .62; try { g.filter = 'blur(' + (1 * k) + 'px)'; } catch (e) { }
+    g.save(); g.globalAlpha = .55; // no canvas filter: Safari support is patchy
     g.drawImage(oc, W8.x - cw3 / 2, ground - 30 * k - ch3 + 2, cw3, ch3);
     g.restore();
   }

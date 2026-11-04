@@ -3185,7 +3185,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v115';
+const GAME_VERSION = 'v116';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -5729,7 +5729,7 @@ ARC_PREVIEW.inv = function (x, y, w, h) {
    music and your taps all agree, even on phones with laggy speakers or Bluetooth headphones. */
 const JJ = {
   BPM: 66, TRAVEL: 5, LEAD: 3,
-  WIN: { perfect: .08, great: .15, good: .22, early: .42 }, // early: you can tap a little ahead of the line and still play the note
+  WIN: { perfect: .08, great: .15, good: .22, early: .6 }, // early: you can tap a little ahead of the line and still play the note
   MINGAP: 2, // the chart only uses notes at least this many eighth-notes apart, so no rapid-fire runs
   COLS: ['#ff4a55', '#ffc928', '#2fd37a', '#3d8bff'],
   KEYS: [['d', '1', 'arrowleft'], ['f', '2', 'arrowdown'], ['j', '3', 'arrowup'], ['k', '4', 'arrowright']],
@@ -5751,7 +5751,7 @@ SCENES.beats = {
   pausable: true,
   enter(p) {
     this.lastParams = p; playTrack(null);
-    this.st = { params: p, ph: 'ready', notes: (() => { let last = -99; return JJ_SONG.notes.filter(n => { if (n.step - last < JJ.MINGAP) return false; last = n.step; return true; }); })().map(n => ({ ...n, t: n.step * jjStep(), hit: null })), score: 0, streak: 0, best: 0, cheer: .6, judged: [], laneFx: [0, 0, 0, 0], held: {}, counts: { perfect: 0, great: 0, good: 0, miss: 0 }, nextStep: 0 };
+    this.st = { params: p, ph: 'ready', notes: (() => { let last = -99; return JJ_SONG.notes.map(n => { const extra = n.step - last < JJ.MINGAP; if (!extra) last = n.step; return { ...n, extra }; }); })().map(n => ({ ...n, t: n.step * jjStep(), hit: null })), lvl: 0, travel: JJ.TRAVEL, score: 0, streak: 0, best: 0, cheer: .6, judged: [], laneFx: [0, 0, 0, 0], held: {}, counts: { perfect: 0, great: 0, good: 0, miss: 0 }, nextStep: 0 };
     this.kh = e => this.rawKey(e, true); this.ku = e => this.rawKey(e, false);
     window.addEventListener('keydown', this.kh, true); window.addEventListener('keyup', this.ku, true);
   },
@@ -5819,10 +5819,16 @@ SCENES.beats = {
     if (st.ph !== 'play') return;
     this.schedule();
     const now = this.now();
+    // as you improve, the game speeds up: the tools slide down faster and the quick in-between notes join the chart
+    { const lv = st.streak >= 32 ? 3 : st.streak >= 18 ? 2 : st.streak >= 8 ? 1 : 0;
+      if (lv > st.lvl) { st.lvl = lv; st.judged.push({ lane: -1, txt: ['', 'SPEED UP!', 'FASTER!', 'MAX SPEED!'][lv], col: '#9ff3e6', t: 0 }); sfx('power'); }
+      else if (lv < st.lvl && st.streak === 0) st.lvl = Math.max(0, st.lvl - 1);
+      st.travel = lerp(st.travel, JJ.TRAVEL * [1, .86, .74, .64][st.lvl], 1 - Math.exp(-1.5 * dt));
+      for (const n of st.notes) { if (n.t - now > st.travel + .2) break; if (n.extra && n.hit == null && n.on == null) { n.on = st.lvl >= 2; if (!n.on) n.hit = 'skip'; } } }
     for (const n of st.notes) if (!n.hit && now - n.t > JJ.WIN.good) { n.hit = 'miss'; st.counts.miss++; st.streak = 0; st.cheer = Math.max(0, st.cheer - .07); st.judged.push({ lane: n.lane, txt: 'MISS', col: '#ff7a7a', t: 0 }); }
     if (st.cheer <= 0) { st.ph = 'over'; st.endT = 0; finishArcade('beats', st.score); sfx('fail'); return; }
     if (now > JJ_SONG.steps * jjStep() + .4) {
-      const tot = st.notes.length, acc = (st.counts.perfect + st.counts.great * .8 + st.counts.good * .5) / tot;
+      const tot = st.notes.filter(n => n.hit !== 'skip').length, acc = (st.counts.perfect + st.counts.great * .8 + st.counts.good * .5) / tot;
       st.acc = acc; st.ph = 'win'; st.endT = 0; finishArcade('beats', st.score); sfx('win'); for (let i = 0; i < 40; i++) spawn('confetti', W / 2, H * .3);
     }
   },
@@ -5859,12 +5865,12 @@ SCENES.beats = {
         for (let l = 0; l < 4; l++) if (st.laneFx[l] > 0) { ctx.save(); ctx.globalAlpha = st.laneFx[l] * .3; ctx.beginPath(); ctx.moveTo(this.laneX(g, l - .5, g.topY), g.topY); ctx.lineTo(this.laneX(g, l + .5, g.topY), g.topY); ctx.lineTo(this.laneX(g, l + .5, g.hitY), g.hitY); ctx.lineTo(this.laneX(g, l - .5, g.hitY), g.hitY); ctx.closePath(); ctx.fillStyle = JJ.COLS[l]; ctx.fill(); ctx.restore(); }
         // frets: nickel wires on each beat, scrolling toward you; every third gets pearl dot inlays
         const per = jjStep() * 2;
-        for (let b = Math.ceil((now - .3) / per); b * per < now + JJ.TRAVEL; b++) {
-          const y = g.hitY - (b * per - now) / JJ.TRAVEL * (g.hitY - g.topY); if (y < g.topY || y > yb) continue;
+        for (let b = Math.ceil((now - .3) / per); b * per < now + (st.travel || JJ.TRAVEL); b++) {
+          const y = g.hitY - (b * per - now) / (st.travel || JJ.TRAVEL) * (g.hitY - g.topY); if (y < g.topY || y > yb) continue;
           const k = clamp((y - g.topY) / (g.hitY - g.topY), 0, 1.2), x0 = this.laneX(g, -.62, y), x1 = this.laneX(g, 3.62, y), th = 1.5 + k * 3;
           ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(x0, y + th * .5, x1 - x0, th * .6);
           const fg = ctx.createLinearGradient(0, y - th / 2, 0, y + th / 2); fg.addColorStop(0, '#f4f6f8'); fg.addColorStop(1, '#8a9098'); ctx.fillStyle = fg; ctx.fillRect(x0, y - th / 2, x1 - x0, th);
-          if (b % 3 === 1) { const yy = y + (g.hitY - g.topY) / JJ.TRAVEL * per * .5, dr = 2 + this.lw(g, yy) * .05; for (const lx of b % 12 === 1 ? [.5, 2.5] : [1.5]) { const ix = this.laneX(g, lx, yy); circ(ctx, ix, yy, dr); fillP(ctx, 'rgba(240,235,225,.85)'); } }
+          if (b % 3 === 1) { const yy = y + (g.hitY - g.topY) / (st.travel || JJ.TRAVEL) * per * .5, dr = 2 + this.lw(g, yy) * .05; for (const lx of b % 12 === 1 ? [.5, 2.5] : [1.5]) { const ix = this.laneX(g, lx, yy); circ(ctx, ix, yy, dr); fillP(ctx, 'rgba(240,235,225,.85)'); } }
         }
         // strings: thick to thin, wound look, shimmer when plucked
         for (let l = 0; l < 4; l++) {
@@ -5892,8 +5898,8 @@ SCENES.beats = {
       // the notes: Christmas baubles
       if (st.ph === 'play' || st.ph === 'ready') for (const n of st.notes) {
         if (n.hit && n.hit !== 'miss') continue;
-        const d = n.t - (st.ph === 'ready' ? -JJ.LEAD : now); if (d > JJ.TRAVEL) break; if (d < -.3) continue;
-        const y = g.hitY - d / JJ.TRAVEL * (g.hitY - g.topY), x = this.laneX(g, n.lane, y), r = this.lw(g, y) * .3;
+        const d = n.t - (st.ph === 'ready' ? -JJ.LEAD : now); if (d > (st.travel || JJ.TRAVEL)) break; if (d < -.3) continue;
+        const y = g.hitY - d / (st.travel || JJ.TRAVEL) * (g.hitY - g.topY), x = this.laneX(g, n.lane, y), r = this.lw(g, y) * .3;
         ctx.save(); if (n.hit === 'miss') ctx.globalAlpha = .35;
         drawSalonNote(ctx, x, y, r, JJ.COLS[n.lane], n.lane); ctx.restore();
       }
@@ -5927,11 +5933,19 @@ function drawBauble(g, x, y, r, col) {
 /* arcade listing + preview */
 GAMES.push({ id: 'beats', name: 'Jingle Jam', sub: 'Hit the salon tools to the beat', col: '#ff8ad0' });
 ARC_PREVIEW.beats = function (x, y, w, h) {
-  ctx.fillStyle = '#120a2a'; ctx.fillRect(x, y, w, h);
-  const cx = x + w / 2, hy = y + h * .82, ty = y + 8, lwB = Math.min(w * .2, 40), lwT = lwB * .5, lx = (l, yy) => cx + (l - 1.5) * lerp(lwT, lwB, (yy - ty) / (hy - ty));
-  for (let l = 0; l <= 4; l++) line(ctx, lx(l - .5, ty), ty, lx(l - .5, hy + 10), hy + 10, 'rgba(255,255,255,.2)', 1);
-  for (let l = 0; l < 4; l++) { circ(ctx, lx(l, hy), hy, lwB * .3); ctx.strokeStyle = JJ.COLS[l]; ctx.lineWidth = 2.5; ctx.stroke(); }
-  for (let k = 0; k < 7; k++) { const l = [0, 1, 2, 1, 3, 2, 0][k], p = ((TT * .6 + k / 7) % 1), yy = lerp(ty, hy, p); drawSalonNote(ctx, lx(l, yy), yy, lerp(lwT, lwB, p) * .28, JJ.COLS[l], l); }
+  // a mini version of the game: the rosewood fretboard in perspective, silver frets scrolling down, strings, glossy buttons
+  const bg = ctx.createLinearGradient(0, y, 0, y + h); bg.addColorStop(0, '#120a2a'); bg.addColorStop(1, '#2a1240'); ctx.fillStyle = bg; ctx.fillRect(x, y, w, h);
+  const cx = x + w / 2, ty = y + 6, hy = y + h * .86, yb = y + h, lwB = Math.min(w * .21, h * .2), lwT = lwB * .45;
+  const lw = yy => lerp(lwT, lwB, (yy - ty) / (hy - ty)), lx = (l, yy) => cx + (l - 1.5) * lw(yy);
+  ctx.beginPath(); ctx.moveTo(lx(-.62, ty), ty); ctx.lineTo(lx(3.62, ty), ty); ctx.lineTo(lx(3.62, yb), yb); ctx.lineTo(lx(-.62, yb), yb); ctx.closePath();
+  const wood = ctx.createLinearGradient(0, ty, 0, yb); wood.addColorStop(0, '#1e120c'); wood.addColorStop(1, '#4e301c'); ctx.fillStyle = wood; ctx.fill();
+  for (const e of [-.62, 3.62]) line(ctx, lx(e, ty), ty, lx(e, yb), yb, '#f2e6cc', 2.4);
+  const per = .9, tr = 3.2, now = TT;
+  for (let b = Math.ceil((now - .3) / per); b * per < now + tr; b++) { const yy = hy - (b * per - now) / tr * (hy - ty); if (yy < ty || yy > yb) continue; const th = 1 + (yy - ty) / (hy - ty) * 2; ctx.fillStyle = '#cfd3d8'; ctx.fillRect(lx(-.62, yy), yy - th / 2, lx(3.62, yy) - lx(-.62, yy), th); }
+  for (let l = 0; l < 4; l++) line(ctx, lx(l, ty), ty, lx(l, yb), yb, l < 2 ? '#d9c08a' : '#e8eaee', 2 - l * .3);
+  for (let l = 0; l < 4; l++) { const bx = lx(l, hy), r = lwB * .38, c = JJ.COLS[l], g2 = ctx.createRadialGradient(bx - r * .3, hy - r * .35, r * .1, bx, hy, r); g2.addColorStop(0, mixToHex(c, '#ffffff', .45)); g2.addColorStop(.7, c); g2.addColorStop(1, shade(c, -.25)); circ(ctx, bx, hy + 3, r); fillP(ctx, shade(c, -.55)); circ(ctx, bx, hy, r); ctx.fillStyle = g2; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1.6; ctx.stroke(); }
+  const seq = [0, 1, 2, 1, 3, 2, 0, 3];
+  for (let k = 0; k < seq.length; k++) { const p = ((TT * .32 + k / seq.length) % 1), yy = lerp(ty, hy, p), l = seq[k]; drawSalonNote(ctx, lx(l, yy), yy, lw(yy) * .3, JJ.COLS[l], l); }
 };
 
 /* the falling notes: salon tools, one kind per lane pair so lanes stay easy to read

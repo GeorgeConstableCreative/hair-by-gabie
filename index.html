@@ -3209,7 +3209,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v121';
+const GAME_VERSION = 'v122';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -4018,13 +4018,15 @@ function drawGabieExterior(t) {
 const XMAS = '"Mountains of Christmas", "Fredoka", cursive';
 const BOLD = '"Luckiest Guy", "Fredoka", "Arial Black", sans-serif';
 const CARD_INTRO = 1.2;
-const CARD_MSG = 'We appreciate all that you do, and the amazing styles you come up with.';
+const CARD_MSG = 'Thank you for all the laughs and the amazing styles all year long. You are absolutely fabulous!';
+// tap the MERRY CHRISTMAS letters to play Jingle Bells, one note per tap (traditional, public domain)
+const JINGLE = [76, 76, 76, 76, 76, 76, 76, 79, 72, 74, 76, 77, 77, 77, 77, 77, 76, 76, 76, 76, 74, 74, 76, 74, 79];
 const MONA_LINES = ['Merry Catmas!', 'Mrrrow!', 'Purr-fect hair, Gabie!', 'Fa-la-la-la-MEOW!', 'Where are my treats?', 'Ho ho ho… meow.'];
 SCENES.card = {
   enter(p) {
     this.p = p || {}; reach('card'); playTrack('card');
     this.bauble = { a: .3, av: 0 }; this.monaAct = null; this.say = null; this.tooted = false; this.stamped = false; this.popped = false; this.nextSwat = 6; this.treeFlash = 0; this.lid = null;
-    this.shoot = []; this.nextShoot = 3; this.sleighT = 5.5; this.flake = null; this.nextFlake = 9; this.gingerJump = 0; this.bells = []; this.fw = []; this.nextFw = 1; this.cannons = false; this.giftHop = [0, 0];
+    this.shoot = []; this.nextShoot = 3; this.sleighT = 5.5; this.flake = null; this.nextFlake = 9; this.gingerJump = 0; this.bells = []; this.fw = []; this.nextFw = 1; this.cannons = false; this.giftHop = [0, 0, 0]; this.lHop = {}; this.lBox = []; this.noteI = 0; this.gOpen = [null, null, null]; this.gBox = []; this.cardJ = 0; this.opened = 0;
   },
   /* the note sizes itself to the room it has: largest text that fits, so nothing is ever cut off */
   fitNote(w, maxH) {
@@ -4079,7 +4081,10 @@ SCENES.card = {
     // confetti cannons when the buttons arrive
     if (t > 7.4 && !this.cannons) { this.cannons = true; sfx('win'); for (let i = 0; i < 26; i++) { spawn('confetti', SAFE.l + 10, H * .55, 1, { vx: rand(120, 420), vy: rand(-620, -260) }); spawn('confetti', W - SAFE.r - 10, H * .55, 1, { vx: rand(-420, -120), vy: rand(-620, -260) }); } }
     // the little presents under the tree hop now and then
-    for (let k = 0; k < 2; k++) { this.giftHop[k] = Math.max(0, this.giftHop[k] - dt); if (!this.giftHop[k] && Math.random() < dt * .25) this.giftHop[k] = .5; }
+    for (const n in this.lHop) { this.lHop[n] -= dt; if (this.lHop[n] <= 0) delete this.lHop[n]; }
+    for (let k = 0; k < 3; k++) if (this.gOpen[k]) { this.gOpen[k].t += dt; if (this.gOpen[k].t > 2.2) this.gOpen[k] = null; }
+    this.cardJ = Math.max(0, this.cardJ - dt);
+    for (let k = 0; k < 3; k++) { this.giftHop[k] = Math.max(0, this.giftHop[k] - dt); if (!this.giftHop[k] && Math.random() < dt * .25) this.giftHop[k] = .5; }
     if (Math.random() < .05) { const L2 = this.layout(); spawn('sparkle', rand(L2.sx + 20, L2.sx + L2.sw * .4), rand(L2.sy + 30, L2.sy + L2.sh * .5)); }
   },
   addShoot(x, y) { const L = this.layout(); this.shoot.push({ x: x != null ? x : rand((PORT ? W : L.sw) * .25, (PORT ? W : L.sw) * .75), y: L.laneY - 14, t: 0, dur: 1, dir: Math.random() < .5 ? -1 : 1 }); },
@@ -4087,6 +4092,21 @@ SCENES.card = {
   down(x, y) {
     if (sceneT < CARD_INTRO + .6) return; // still unwrapping
     const L = this.layout(), M = this.monaPos(L), G = this.gingerPos(L);
+    // a letter of MERRY CHRISTMAS: it jumps and rings the next note of Jingle Bells
+    for (const b of this.lBox) if (Math.abs(x - b[0]) < b[2] / 2 + 4 && Math.abs(y - b[1]) < b[3] * .55) {
+      audioInit(); this.lHop[b[4]] = .5; const m = JINGLE[this.noteI++ % JINGLE.length];
+      if (AU.c && typeof I !== 'undefined' && I.bell) { const tt = AU.c.currentTime + .01; I.bell(tt, m, .5, .16); I.bell(tt, m + 12, .3, .05); } else sfx('ding');
+      spawn('sparkle', b[0], b[1] - b[3] * .4, 6); return;
+    }
+    // a present: it hops and a surprise pops out
+    for (const g of this.gBox) if (Math.abs(x - g[0]) < g[2] / 2 + 8 && y > g[1] - g[3] - 10 && y < g[1] + 8) {
+      if (this.gOpen[g[4]]) return; this.gOpen[g[4]] = { t: 0 }; this.giftHop[g[4]] = .5; this.opened++; sfx('pop'); sfx('chime');
+      for (let i = 0; i < 18; i++) spawn('confetti', g[0], g[1] - g[3], 1, { vx: rand(-220, 220), vy: rand(-520, -200) }); return;
+    }
+    // the message card: it wiggles with a burst of confetti
+    if (sceneT - CARD_INTRO > 4 && Math.abs(x - L.tx) < L.mw / 2 && y > L.my && y < L.my + L.mh) {
+      this.cardJ = .7; sfx('win'); for (let i = 0; i < 24; i++) spawn('confetti', x, y, 1, { vx: rand(-300, 300), vy: rand(-560, -180) }); return;
+    }
     if (Math.abs(x - G.x) < 40 * G.s && y > G.gy - 130 * G.s && y < G.gy + 4) { this.gingerJump = .8; sfx('jump'); this.say = null; spawn('sparkle', x, y, 8); return; }
     if (y < L.sy - 4 && y > L.laneY - 40) { this.addShoot(); sfx('chime'); this.bells.push({ x: clamp(x, 30, (PORT ? W : L.sw) - 30), y: L.laneY, t: 0 }); return; }
     if (sceneT - CARD_INTRO > 2.6 && Math.abs(x - M.bx) < 80 * M.s && y > M.boxTop - 150 * M.s && y < M.gy) {
@@ -4097,26 +4117,19 @@ SCENES.card = {
   },
   draw() {
     const t = sceneT - CARD_INTRO, L = this.layout();
-    // deep, glowing Christmas night
-    const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#070d2e'); sky.addColorStop(.45, '#14245c'); sky.addColorStop(.8, '#25407e'); sky.addColorStop(1, '#3a5c96'); ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-    { const hg = ctx.createRadialGradient(L.tx, L.gabbyY - 40, 10, L.tx, L.gabbyY - 40, (PORT ? W : L.mw) * .75); hg.addColorStop(0, 'rgba(255,190,90,.26)'); hg.addColorStop(1, 'rgba(255,190,90,0)'); ctx.fillStyle = hg; ctx.fillRect(0, 0, W, H); }
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    // northern lights
-    for (let k = 0; k < 3; k++) {
-      const col = ['rgba(80,255,170,', 'rgba(90,190,255,', 'rgba(230,110,255,'][k], baseY = (PORT ? L.sy + 10 : L.sy + 60) - k * 40;
-      for (let i = 0; i < 26; i++) { const x = i * W / 25, y = baseY + Math.sin(i * .45 + TT * .5 + k * 2) * 26 + Math.sin(i * .17 - TT * .3) * 20, hh = 70 + 40 * Math.sin(i * .6 + TT + k); const g = ctx.createLinearGradient(0, y - hh, 0, y + 20); g.addColorStop(0, col + '0)'); g.addColorStop(.7, col + '.13)'); g.addColorStop(1, col + '0)'); ctx.fillStyle = g; ctx.fillRect(x - W / 50, y - hh, W / 25 + 2, hh + 20); }
-    }
-    // glowing bokeh lights drifting slowly
-    for (let i = 0; i < 22; i++) { const s1 = (i * .618 + .2) % 1, s2 = (i * .377) % 1, x = (s1 * W + Math.sin(TT * .2 + i) * 30 + W) % W, y = ((s2 * H * .9 - TT * (6 + s1 * 6)) % (H * .9) + H * .9) % (H * .9), r = 10 + s2 * 22, col = ['255,120,90', '255,210,90', '120,230,160', '120,180,255', '255,140,210'][i % 5]; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(' + col + ',.34)'); g.addColorStop(.6, 'rgba(' + col + ',.12)'); g.addColorStop(1, 'rgba(' + col + ',0)'); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
-    ctx.restore();
-    // twinkling stars with a soft halo
-    const r0 = mulberry(4); for (let i = 0; i < 80; i++) { const x = r0() * W, y = r0() * H * .75, sz = 1.2 + r0() * 2.4, tw = .3 + .7 * Math.abs(Math.sin(TT * (.8 + r0() * 2) + i)); ctx.globalAlpha = tw; circ(ctx, x, y, sz * 2.6); fillP(ctx, 'rgba(255,240,200,.15)'); drawStar(ctx, x, y, sz, '#fff6d8', 4); }
+    // a bright, sunny winter wonderland: candy-blue sky, fluffy clouds, sparkles and pastel bokeh
+    const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#1fa2ff'); sky.addColorStop(.45, '#62c9ff'); sky.addColorStop(.75, '#b6ecff'); sky.addColorStop(1, '#ffe3f2'); ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    { const hg = ctx.createRadialGradient(L.tx, L.gabbyY - 40, 10, L.tx, L.gabbyY - 40, (PORT ? W : L.mw) * .8); hg.addColorStop(0, 'rgba(255,255,255,.45)'); hg.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = hg; ctx.fillRect(0, 0, W, H); }
+    // drifting clouds
+    for (let i = 0; i < 5; i++) { const s1 = (i * .618 + .1) % 1, cw0 = 90 + s1 * 80, cx = ((s1 * W + TT * (8 + i * 3)) % (W + cw0 * 2)) - cw0, cy = H * (.1 + ((i * .37) % 1) * .38);
+      ctx.save(); ctx.globalAlpha = .75; ctx.fillStyle = '#ffffff'; for (const [dx, dy, r] of [[0, 0, .3], [.25, -.12, .26], [.5, 0, .3], [.25, .06, .28]]) { circ(ctx, cx + dx * cw0, cy + dy * cw0, r * cw0 * .6); ctx.fill(); } ctx.restore(); }
+    // pastel bokeh
+    for (let i = 0; i < 18; i++) { const s1 = (i * .618 + .2) % 1, s2 = (i * .377) % 1, x = (s1 * W + Math.sin(TT * .2 + i) * 30 + W) % W, y = ((s2 * H * .9 - TT * (6 + s1 * 6)) % (H * .9) + H * .9) % (H * .9), r = 8 + s2 * 18, col = ['#ff6fae', '#ffd34d', '#5ee08a', '#ffffff', '#ff9a5a'][i % 5]; ctx.globalAlpha = .28; circ(ctx, x, y, r); fillP(ctx, col); ctx.globalAlpha = 1; }
+    // twinkling sparkles
+    const r0 = mulberry(4); for (let i = 0; i < 34; i++) { const x = r0() * W, y = r0() * H * .7, sz = 2 + r0() * 3, tw = .3 + .7 * Math.abs(Math.sin(TT * (.8 + r0() * 2) + i)); ctx.globalAlpha = tw; drawStar(ctx, x, y, sz, '#ffffff', 4); }
     ctx.globalAlpha = 1;
-    // glowing crescent moon
-    { const mx = PORT ? SAFE.l + 58 : W / 5 * Math.max(1, Math.round(L.sw * .3 / (W / 5))), my = PORT ? L.l1 + 6 : L.laneY + 16, R0 = PORT ? 28 * Math.max(.75, L.f) : 18; ctx.save(); ctx.shadowColor = '#fff2b8'; ctx.shadowBlur = 40;
-      ctx.beginPath(); ctx.arc(mx, my, R0, Math.PI * .28, Math.PI * 1.72, false); ctx.arc(mx + 12, my - 4, R0 * .88, Math.PI * 1.62, Math.PI * .38, true); ctx.closePath(); fillP(ctx, '#fff4cf'); ctx.restore(); }
     for (const s of this.shoot) { if (this.sleighT < 0) continue; const k = s.t / s.dur, x = s.x + s.dir * k * 160, y = s.y + k * 18, a = Math.sin(k * Math.PI); const g = ctx.createLinearGradient(x, y, x - s.dir * 80, y - 9); g.addColorStop(0, 'rgba(255,240,150,' + a + ')'); g.addColorStop(1, 'rgba(255,240,150,0)'); ctx.strokeStyle = g; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - s.dir * 80, y - 9); ctx.stroke(); ctx.globalAlpha = a; drawStar(ctx, x, y, 7, '#ffd34d', 5); ctx.globalAlpha = 1; }
-    for (const f of this.fw) { const k = E.out(Math.min(1, f.t / .7)), a = 1 - Math.max(0, (f.t - .5) / .8); ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a; for (let i = 0; i < f.n; i++) { const an = i / f.n * TAU, rr2 = f.r * k, x = f.x + Math.cos(an) * rr2, y = f.y + Math.sin(an) * rr2 * .55 + f.t * f.t * 12; circ(ctx, x, y, 2.4); fillP(ctx, f.col); line(ctx, f.x + Math.cos(an) * rr2 * .6, f.y + Math.sin(an) * rr2 * .33, x, y, f.col, 1.2); } if (f.t < .2) { circ(ctx, f.x, f.y, 6 * (1 - f.t * 5)); fillP(ctx, '#fff'); } ctx.restore(); }
+    for (const f of this.fw) { const k = E.out(Math.min(1, f.t / .7)), a = 1 - Math.max(0, (f.t - .5) / .8); ctx.save(); ctx.globalAlpha = a; for (let i = 0; i < f.n; i++) { const an = i / f.n * TAU, rr2 = f.r * k, x = f.x + Math.cos(an) * rr2, y = f.y + Math.sin(an) * rr2 * .55 + f.t * f.t * 12; circ(ctx, x, y, 2.4); fillP(ctx, f.col); line(ctx, f.x + Math.cos(an) * rr2 * .6, f.y + Math.sin(an) * rr2 * .33, x, y, f.col, 1.2); } if (f.t < .2) { circ(ctx, f.x, f.y, 6 * (1 - f.t * 5)); fillP(ctx, '#fff'); } ctx.restore(); }
     for (const b of this.bells) { ctx.globalAlpha = 1 - b.t / 1.2; drawBell(ctx, b.x, b.y - b.t * 12, 1.2 + b.t * .2, Math.sin(b.t * 20) * .4); ctx.globalAlpha = 1; }
     // Santa's sleigh sweeps across the moon, trailing stardust
     if (this.sleighT < 0) { ctx.save(); if (!PORT) { ctx.beginPath(); ctx.rect(0, 0, L.sx + L.sw, H); ctx.clip(); } const k = -this.sleighT / 6, sx2 = lerp(-170, (PORT ? W : L.sx + L.sw) + 60, k), sy2 = L.laneY + 10 + Math.sin(TT * 3) * 3; for (let i = 0; i < 18; i++) { const tx = sx2 - 44 - i * 10, ty = sy2 + Math.sin(TT * 6 + i) * 2; ctx.globalAlpha = (1 - i / 18) * .8; drawStar(ctx, tx, ty, 2 + (i % 3), ['#ffd34d', '#fff6d8', '#ff8ad0'][i % 3], 4); } ctx.globalAlpha = 1; drawSleigh(ctx, sx2, sy2, L.laneS); ctx.restore(); }
@@ -4124,8 +4137,8 @@ SCENES.card = {
     for (let i = 0; i < 16; i++) { const s1 = (i * .381 + .1) % 1, s2 = (i * .727) % 1, x = (s1 * W + Math.sin(TT * .5 + i * 2) * 40 + W) % W, y = (s2 * (H + 60) + TT * (30 + s1 * 18)) % (H + 60) - 30; ctx.globalAlpha = .55; drawSnowflake(ctx, x, y, 6 + s2 * 6, TT * (s1 - .5)); } ctx.globalAlpha = 1;
     // snowy hills
     const gy = L.sy + L.sh * .9;
-    ctx.fillStyle = '#8fa8d8'; ctx.beginPath(); ctx.moveTo(0, gy - 30); for (let x = 0; x <= W; x += 30) ctx.lineTo(x, gy - 30 - Math.sin(x * .01 + 1) * 18); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill();
-    ctx.fillStyle = '#dbe6fb'; ctx.beginPath(); ctx.moveTo(0, gy); for (let x = 0; x <= W; x += 30) ctx.lineTo(x, gy - Math.sin(x * .008) * 10); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill();
+    ctx.fillStyle = '#c4f0ff'; ctx.beginPath(); ctx.moveTo(0, gy - 30); for (let x = 0; x <= W; x += 30) ctx.lineTo(x, gy - 30 - Math.sin(x * .01 + 1) * 18); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(0, gy); for (let x = 0; x <= W; x += 30) ctx.lineTo(x, gy - Math.sin(x * .008) * 10); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill();
     // snowfall, far layer (the near flakes fall over everything at the end)
     ctx.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 70; i++) { const s1 = (i * .618) % 1, s2 = (i * .414 + .3) % 1; circ(ctx, (s1 * W + Math.sin(TT * .8 + i) * 16 + W) % W, (s2 * H + TT * (18 + s2 * 20)) % H, .8 + s1 * 1.6); ctx.fill(); }
     // warm glow pooling on the snow beneath the tree and the present
@@ -4162,10 +4175,10 @@ SCENES.card = {
     if (t > 7.4) {
       ctx.globalAlpha = clamp((t - 7.4) * 2, 0, 1);
       const bw = Math.min(W - 40, 360) / 2 - 6, by = L.by;
-      btn('again', L.tx - bw - 6, by, bw, L.bh, 'Play again', () => go('title'), { color: '#e0283c', size: Math.round(L.bh * .38) });
-      btn('arc', L.tx + 6, by, bw, L.bh, 'Arcade', () => go('arcade', { next: null }), { color: '#1f9a50', size: Math.round(L.bh * .38) });
+      xmasBtn('again', L.tx - bw - 6, by, bw, L.bh, 'Play again', () => go('title'), 'candy');
+      xmasBtn('arc', L.tx + 6, by, bw, L.bh, 'Arcade', () => go('arcade', { next: null }), 'arcade');
       ctx.globalAlpha = 1;
-      if (t < 14 && !this.say) { const M2 = this.monaPos(L); pill(PORT ? 'Tap Mona, the gingerbread man or the sky!' : 'Tap Mona, the gingerbread man or the sky!', M2.bx - (PORT ? 70 : 40), M2.gy + 26, { size: 15, bg: 'rgba(200,69,59,.9)' }); } if (false) text(ctx, '', 0, 0, { size: 16, color: '#fff6d8', weight: 600 });
+      if (t < 14 && !this.say) { const M2 = this.monaPos(L); pill(this.opened ? 'Tap the letters to play Jingle Bells!' : 'Open the presents, tap Mona or the letters!', L.tx, M2.gy + 26, { size: 15, bg: 'rgba(217,40,90,.92)' }); } if (false) text(ctx, '', 0, 0, { size: 16, color: '#fff6d8', weight: 600 });
     }
   },
   drawTree(x, gy, h) {
@@ -4183,7 +4196,24 @@ SCENES.card = {
   drawScene(L, t) {
     const M = this.monaPos(L), s = M.s;
     this.drawTree(L.sx + L.sw * .22, M.gy + 4, L.sh * .82);
-    { const tx = L.sx + L.sw * .22, gw = L.sh * .1, h0 = Math.sin(this.giftHop[0] / .5 * Math.PI) * gw * .5, h1 = Math.sin(this.giftHop[1] / .5 * Math.PI) * gw * .5; this.drawGift(tx - L.sh * .14, M.gy + 6 - h0, gw, gw * .85, '#5aa7ff', '#fff6d8'); this.drawGift(tx + L.sh * .14, M.gy + 6 - h1, gw * 1.1, gw * .8, '#ff7eb6', '#ffd34d'); }
+    { const tx = L.sx + L.sw * .22, gw = L.sh * .12, G3 = [[tx - L.sh * .17, gw, gw * .85, '#5aa7ff', '#fff6d8'], [tx + L.sh * .17, gw * 1.1, gw * .8, '#ff4fa0', '#ffd34d'], [tx, gw * 1.25, gw * .7, '#2fd37a', '#ff4a55']];
+      this.gBox = [];
+      G3.forEach(([gx, w2, h2, c1, c2], k) => {
+        const hp = Math.sin(clamp(this.giftHop[k] / .5, 0, 1) * Math.PI) * gw * .5, gyy = M.gy + 6 - hp, wig = this.gOpen[k] ? 0 : Math.sin(TT * 3 + k * 2) * .03;
+        ctx.save(); ctx.translate(gx, gyy); ctx.rotate(wig); ctx.translate(-gx, -gyy); this.drawGift(gx, gyy, w2, h2, c1, c2);
+        // a bow on top
+        for (const sd of [-1, 1]) { ell(ctx, gx + sd * w2 * .16, gyy - h2 - w2 * .06, w2 * .16, w2 * .09, sd * .5); ink(ctx, c2, 1.6); }
+        ctx.restore();
+        this.gBox.push([gx, M.gy + 6, w2, h2, k]);
+        const o = this.gOpen[k];
+        if (o) { // the surprise rises out of the box and sparkles
+          const k2 = E.out(clamp(o.t / .6, 0, 1)), sy3 = gyy - h2 - k2 * gw * 1.6, al = o.t > 1.6 ? 1 - (o.t - 1.6) / .6 : 1, r3 = gw * .45;
+          ctx.save(); ctx.globalAlpha = al; ctx.translate(gx, sy3); ctx.rotate(Math.sin(o.t * 6) * .15);
+          if (k === 0) drawHeart(ctx, 0, 0, r3 / 14, '#ff3b6b'); else if (k === 1) drawStar(ctx, 0, 0, r3, '#ffd34d', 5); else drawSalonNote(ctx, 0, 0, r3 * .9, '#ff4a55', 0);
+          ctx.restore(); if (Math.random() < .3) spawn('sparkle', gx + rand(-r3, r3), sy3 + rand(-r3, r3));
+        }
+      });
+    }
     // a dancing gingerbread friend (tap him!)
     { const G = this.gingerPos(L), jk = this.gingerJump > 0 ? Math.sin((1 - this.gingerJump / .8) * Math.PI) : 0; drawGingerbread(ctx, G.x, G.gy - jk * 40 * G.s, G.s, TT * (jk > 0 ? 2.2 : 1), 0); }
     // the big present Mona hides in
@@ -4230,7 +4260,7 @@ SCENES.card = {
     const widthAt = (s, w) => { ctx.font = '400 ' + s + 'px ' + BOLD; return ctx.measureText(w).width + w.length * s * track; };
     const fit = L.twoLine ? Math.min(maxW / widthAt(100, 'MERRY') * 100 / .82, maxW / widthAt(100, 'CHRISTMAS,') * 100) : maxW / widthAt(100, 'MERRY CHRISTMAS,') * 100;
     const base = Math.min(L.twoLine ? 100 * L.f : 54, fit);
-    let n = 0;
+    let n = 0; this.lBox = [];
     for (const [wd, ly] of rows) {
       const parts = wd ? [[wd[0], wd]] : [['MERRY ', words[0]], ['CHRISTMAS,', words[1]]];
       const sizeOf = w => wd ? base * w[4] : base;
@@ -4241,7 +4271,8 @@ SCENES.card = {
         for (let i = 0; i < str.length; i++, n++) {
           const ch = str[i], cw = ctx.measureText(ch).width + size * track, ti = .2 + n * .055, k = clamp((t - ti) / .5, 0, 2);
           if (t > ti && ch !== ' ') {
-            const sp = E.spring(k), wave = Math.sin(TT * 2.6 - n * .45), y = ly - (1 - sp) * 110 + wave * 3.5, rot = Math.sin(TT * 1.8 + n) * .03;
+            const hop = this.lHop[n] > 0 ? Math.sin((1 - this.lHop[n] / .5) * Math.PI) : 0, sp = E.spring(k), wave = Math.sin(TT * 2.6 - n * .45), y = ly - (1 - sp) * 110 + wave * 3.5 - hop * size * .45, rot = Math.sin(TT * 1.8 + n) * .03 + hop * .25;
+            this.lBox.push([x + cw / 2, ly, cw, size, n]);
             ctx.save(); ctx.translate(x + cw / 2, y); ctx.rotate(rot); ctx.scale(sp, sp);
             ctx.font = '400 ' + size + 'px ' + BOLD; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
             const ext = Math.max(4, size * .075);
@@ -4290,11 +4321,14 @@ SCENES.card = {
     if (t > 3.6) {
       const a = clamp((t - 3.6) * 3, 0, 1), w = L.mw, x0 = L.tx - w / 2, y0 = L.my, h = L.mh, nk = L.note.k, ns = L.note.s, rise = (1 - E.back(a)) * 30;
       ctx.save(); ctx.globalAlpha = a; ctx.translate(0, rise);
-      ctx.save(); ctx.shadowColor = 'rgba(0,0,20,.45)'; ctx.shadowBlur = 26; ctx.shadowOffsetY = 10; rr(ctx, x0, y0, w, h, 20); const vg = ctx.createLinearGradient(0, y0, 0, y0 + h); vg.addColorStop(0, '#c8162e'); vg.addColorStop(1, '#8c0c20'); ctx.fillStyle = vg; ctx.fill(); ctx.restore();
+      if (this.cardJ > 0) { const cj = this.cardJ / .7, cy0 = y0 + h / 2; ctx.translate(L.tx, cy0); ctx.rotate(Math.sin(cj * 18) * .04 * cj); ctx.scale(1 + .04 * cj, 1 + .04 * cj); ctx.translate(-L.tx, -cy0); }
+      ctx.save(); ctx.shadowColor = 'rgba(0,0,20,.45)'; ctx.shadowBlur = 26; ctx.shadowOffsetY = 10; rr(ctx, x0, y0, w, h, 20); const vg = ctx.createLinearGradient(0, y0, 0, y0 + h); vg.addColorStop(0, '#ff2d55'); vg.addColorStop(1, '#d10f3a'); ctx.fillStyle = vg; ctx.fill(); ctx.restore();
+      // candy-cane edge
+      ctx.save(); rr(ctx, x0 + 3, y0 + 3, w - 6, h - 6, 18); ctx.setLineDash([14, 12]); ctx.lineDashOffset = -TT * 20; strokeP(ctx, '#ffffff', 6); ctx.restore();
       // faint snowflake damask
       ctx.save(); rr(ctx, x0, y0, w, h, 20); ctx.clip(); ctx.globalAlpha = .1; for (let yy = y0 + 18, r = 0; yy < y0 + h; yy += 34, r++) for (let xx = x0 + 18 + (r % 2) * 17; xx < x0 + w; xx += 34) drawSnowflake(ctx, xx, yy, 7, 0); ctx.restore(); ctx.globalAlpha = a;
       // gold double border with corner flourishes
-      rr(ctx, x0 + 8, y0 + 8, w - 16, h - 16, 14); strokeP(ctx, '#f2c45a', 2.4); rr(ctx, x0 + 13, y0 + 13, w - 26, h - 26, 11); strokeP(ctx, 'rgba(242,196,90,.55)', 1.2);
+      rr(ctx, x0 + 8, y0 + 8, w - 16, h - 16, 14); strokeP(ctx, '#ffe066', 2.4); rr(ctx, x0 + 13, y0 + 13, w - 26, h - 26, 11); strokeP(ctx, 'rgba(242,196,90,.55)', 1.2);
       for (const [cx2, cy2] of [[x0 + 13, y0 + h - 13], [x0 + w - 13, y0 + h - 13]]) drawStar(ctx, cx2, cy2, 6, '#f2c45a', 4);
       // holly sprigs on the top corners
       const holly = (hx, hy, sd) => { ctx.save(); ctx.translate(hx, hy); ctx.scale(1.3, 1.3); for (const [ang, len] of [[-.5, 1], [.35, .9], [1.1, .8]]) { ctx.save(); ctx.rotate(sd * ang); ctx.beginPath(); ctx.moveTo(0, 0); for (let k = 0; k <= 4; k++) ctx.lineTo(sd * (6 + k * 6) * len, (k % 2 ? -6 : -1) * len); for (let k = 4; k >= 0; k--) ctx.lineTo(sd * (6 + k * 6) * len, (k % 2 ? 6 : 1) * len); ctx.closePath(); ink(ctx, k2col(ang), 1.4); line(ctx, 0, 0, sd * 28 * len, 0, 'rgba(0,0,0,.2)', 1); ctx.restore(); } for (let k = 0; k < 3; k++) { circ(ctx, -sd * 2 + (k - 1) * 5, 4 + (k % 2) * 4, 4.4); ink(ctx, '#e0283c', 1.2); circ(ctx, -sd * 2 + (k - 1) * 5 - 1.4, 2.6 + (k % 2) * 4, 1.2); fillP(ctx, '#fff'); } ctx.restore(); };
@@ -4307,11 +4341,11 @@ SCENES.card = {
         ell(ctx, 0, 1, 7, 6); ink(ctx, '#f2c45a', 1.6); ctx.restore(); }
       // words
       const shown = Math.floor(clamp((t - 4) * 34, 0, CARD_MSG.length));
-      text(ctx, 'Dear Gabie,', L.tx, y0 + 46 * nk, { size: 32 * nk, font: SCRIPT, weight: 400, color: '#ffd77a' });
+      text(ctx, 'Dear Gabie,', L.tx, y0 + 46 * nk, { size: 32 * nk, font: SCRIPT, weight: 400, color: '#fff27a' });
       para(ctx, CARD_MSG.slice(0, shown) + (shown < CARD_MSG.length && Math.sin(TT * 12) > 0 ? '|' : ''), L.tx, y0 + 86 * nk, w - 64, { size: ns, color: '#fff6ea', weight: 600, lh: ns * 1.3 });
       if (t > 6.2) {
         ctx.globalAlpha = a * clamp((t - 6.2) * 3, 0, 1);
-        text(ctx, 'Love from', L.tx, y0 + h - 70 * nk, { size: 32 * nk, font: SCRIPT, weight: 400, color: '#ffd77a' });
+        text(ctx, 'Love from', L.tx, y0 + h - 70 * nk, { size: 32 * nk, font: SCRIPT, weight: 400, color: '#fff27a' });
         const a1 = 'Samantha, Mona', a2 = 'and George', fs = 24 * nk, gp = 40 * nk, w1 = textW(a1, fs, 700), w2 = textW(a2, fs, 700), tot = w1 + gp + w2, lx = L.tx - tot / 2, ly = y0 + h - 34 * nk;
         text(ctx, a1, lx, ly, { size: fs, color: '#ffffff', weight: 700, align: 'left' });
         text(ctx, a2, lx + w1 + gp, ly, { size: fs, color: '#ffffff', weight: 700, align: 'left' });

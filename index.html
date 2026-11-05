@@ -3209,7 +3209,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v123';
+const GAME_VERSION = 'v124';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -4453,6 +4453,114 @@ function drawGiftWrapIntro(t) {
     text(ctx, 'For Gabie', 0, 130, { size: 30, font: SCRIPT, weight: 400, color: '#fff6d8', stroke: '#8a1424', sw: 6 });
     ctx.restore(); }
 }
+
+/* =================== CHRISTMAS CARD v2: a colour-block poster ===================
+   Inspired by bold Swiss-style holiday posters: MERRY XMAS spelled in a 3×3 grid of colour tiles, each letter
+   oversized and cropped by its tile. Tap a tile to flip it to new colours and ring the next note of Jingle Bells.
+   Mona sits on top of the grid; the message is set below in quiet, elegant type. */
+const XTILES = [['M', '#f7b3d4', '#33201a'], ['E', '#b9e4e2', '#ef4a45'], ['R', '#c3e57a', '#2a1f8f'], ['R', '#ff5f1f', '#ffbe8e'], ['Y', '#9b46a0', '#0e9480'], ['X', '#1b3359', '#dca92a'], ['M', '#f7d84e', '#6db3cf'], ['A', '#e3d6ec', '#c8102e'], ['S', '#f9c1d3', '#237d2e']];
+const XPAIRS = XTILES.map(t => [t[1], t[2]]).concat([['#ffd34d', '#d8233a'], ['#2fd37a', '#ffffff'], ['#ff4fa0', '#fff3c8'], ['#3d8bff', '#ffd34d']]);
+SCENES.card = {
+  enter(p) {
+    this.p = p || {}; reach('card'); playTrack('card');
+    this.tiles = XTILES.map(t => ({ ch: t[0], bg: t[1], fg: t[2], flip: 0, swapped: false, next: null }));
+    this.noteI = 0; this.say = null; this.monaAct = null; this.cardJ = 0; this.landed = 0; this.tapped = 0;
+  },
+  layout() {
+    const tile = PORT ? Math.min((W - 64) / 3, (H - SAFE.t - SAFE.b - 520) / 3, 180) : Math.min((H - SAFE.t - SAFE.b - 150) / 3, W * .15);
+    const gw = tile * 3, gx = PORT ? W / 2 - gw / 2 : W * .3 - gw / 2, total = gw + 54 + 250 + 120, gy = SAFE.t + (PORT ? Math.max(150, (H - SAFE.t - SAFE.b - total) / 2 + 70) : 108);
+    const tx = PORT ? W / 2 : W * .73, ty = PORT ? gy + gw + 54 : SAFE.t + 120, tw = PORT ? Math.min(W - 60, 500) : W * .4;
+    return { tile, gw, gx, gy, tx, ty, tw };
+  },
+  tileAt(L, x, y) { const c = Math.floor((x - L.gx) / L.tile), r = Math.floor((y - L.gy) / L.tile); return c >= 0 && c < 3 && r >= 0 && r < 3 ? r * 3 + c : -1; },
+  monaSpot(L) { const s = L.tile / 230; return { x: L.gx + L.gw - L.tile * .45, y: L.gy + 2, s, top: L.gy - 210 * s }; },
+  update(dt) {
+    const t = sceneT - CARD_INTRO;
+    for (let i = 0; i < 9; i++) { const tl = this.tiles[i];
+      if (tl.flip > 0) { tl.flip -= dt; if (tl.flip < .25 && !tl.swapped) { tl.swapped = true; tl.bg = tl.next[0]; tl.fg = tl.next[1]; } }
+      if (t > .25 + i * .12 && this.landed <= i) { this.landed = i + 1; sfx(i % 3 === 2 ? 'ding' : 'pop'); } }
+    if (this.landed === 9 && !this.cheered && t > 1.6) { this.cheered = true; sfx('win'); for (let i = 0; i < 30; i++) spawn('confetti', W / 2, this.layout().gy, 1, { vx: rand(-360, 360), vy: rand(-560, -160) }); }
+    if (this.say) { this.say.t += dt; if (this.say.t > 2.4) this.say = null; }
+    if (this.monaAct) { this.monaAct.t += dt; if (this.monaAct.t > this.monaAct.dur) this.monaAct = null; }
+    if (t > 3 && !this.say && Math.random() < dt * .12) this.say = { msg: pick(MONA_LINES), t: 0 };
+    this.cardJ = Math.max(0, this.cardJ - dt);
+  },
+  down(x, y) {
+    if (sceneT < CARD_INTRO + .6) return;
+    const L = this.layout(), M = this.monaSpot(L);
+    if (Math.abs(x - M.x) < 80 * M.s * 1.6 && y > M.top && y < M.y + 4) { this.monaAct = { kind: 'celebrate', t: 0, dur: 1.1 }; this.say = { msg: pick(MONA_LINES), t: 0 }; sfx('meow'); spawn('heart', x, y, 6); return; }
+    const i = this.tileAt(L, x, y);
+    if (i >= 0) {
+      const tl = this.tiles[i]; if (tl.flip > 0) return;
+      let nx; do { nx = pick(XPAIRS); } while (nx[0] === tl.bg);
+      tl.flip = .5; tl.swapped = false; tl.next = nx; this.tapped++;
+      audioInit(); const m = JINGLE[this.noteI++ % JINGLE.length];
+      if (AU.c && typeof I !== 'undefined' && I.bell) { const tt = AU.c.currentTime + .01; I.bell(tt, m, .5, .16); I.bell(tt, m + 12, .3, .05); } else sfx('ding');
+      for (let k = 0; k < 8; k++) spawn('confetti', x, y, 1, { vx: rand(-200, 200), vy: rand(-420, -160) });
+      return;
+    }
+    if (y > L.ty - 20 && y < L.ty + 300 && Math.abs(x - L.tx) < L.tw / 2) { this.cardJ = .6; sfx('chime'); for (let k = 0; k < 14; k++) spawn('sparkle', x + rand(-60, 60), y + rand(-30, 30)); return; }
+    spawn('sparkle', x, y, 8);
+  },
+  draw() {
+    const t = sceneT - CARD_INTRO, L = this.layout();
+    // warm ivory paper
+    ctx.fillStyle = '#fbf8f3'; ctx.fillRect(0, 0, W, H);
+    // the grid of colour tiles
+    for (let i = 0; i < 9; i++) {
+      const tl = this.tiles[i], c = i % 3, r = Math.floor(i / 3), x = L.gx + c * L.tile, y = L.gy + r * L.tile, T = L.tile;
+      const t0 = .25 + i * .12, k = E.spring(clamp((t - t0) / .55, 0, 2)); if (t < t0) continue;
+      const fl = tl.flip > 0 ? Math.abs(Math.cos((1 - tl.flip / .5) * Math.PI)) : 1, hov = Math.sin(TT * 1.6 + i * .9) * .6;
+      ctx.save(); ctx.translate(x + T / 2, y + T / 2 + (1 - k) * -60); ctx.scale(fl * k, k); ctx.translate(-x - T / 2, -y - T / 2);
+      ctx.save(); ctx.beginPath(); ctx.rect(x - .5, y - .5, T + 1, T + 1); ctx.clip();
+      ctx.fillStyle = tl.bg; ctx.fillRect(x - 1, y - 1, T + 2, T + 2);
+      // the letter: heavy geometric sans, oversized so the tile crops it, just like the poster
+      const fs = T * 1.32; ctx.font = '700 ' + fs + 'px Jost, Futura, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      const cw = ctx.measureText(tl.ch).width, sx = Math.min(1.25, T * 1.04 / cw);
+      ctx.save(); ctx.translate(x + T / 2, y + T + fs * .2 + hov); ctx.scale(sx, 1); ctx.fillStyle = tl.fg; ctx.fillText(tl.ch, 0, 0); ctx.restore();
+      ctx.restore(); ctx.restore();
+    }
+    // snow drifting softly across the poster
+    for (let i = 0; i < 46; i++) { const s1 = (i * .618) % 1, s2 = (i * .414 + .3) % 1, x = (s1 * W + Math.sin(TT * .8 + i) * 16 + W) % W, y = (s2 * H + TT * (16 + s2 * 18)) % H; ctx.globalAlpha = .55; circ(ctx, x, y, 1.6 + s1 * 2.2); fillP(ctx, i % 5 ? '#ffffff' : '#c9d6e8'); ctx.globalAlpha = 1; }
+    // Mona in her Santa hat, perched on top of the grid
+    if (t > 1.4) {
+      const M = this.monaSpot(L), jt = t - 1.4, jump = jt < .5 ? Math.sin(jt / .5 * Math.PI) * 60 * M.s : 0;
+      const o = { pose: jt < 1 ? 'celebrate' : 'sit', outfit: 'santa', t: TT, face: 1, eyes: 'open' };
+      if (this.monaAct) { o.pose = 'celebrate'; o.eyes = 'happy'; } else if (o.pose === 'sit' && (TT % 3.7) < .14) o.eyes = 'closed'; else if (o.pose === 'celebrate') o.eyes = 'happy';
+      ctx.save(); ctx.translate(M.x, M.y - jump); drawMona(ctx, 0, 0, M.s, o); ctx.restore();
+      if (this.say) speechBubble(this.say.msg, M.x - L.tile * .9, Math.max(SAFE.t + 96, M.top + 10), { t: this.say.t, size: 16 });
+    }
+    // the message, set like the poster's footer: quiet, centred, elegant
+    if (t > 1.8) {
+      const a = clamp((t - 1.8) * 2.5, 0, 1), j = this.cardJ > 0 ? Math.sin(this.cardJ / .6 * 18) * .02 * (this.cardJ / .6) : 0;
+      ctx.save(); ctx.globalAlpha = a; ctx.translate(L.tx, L.ty); ctx.rotate(j); ctx.translate(-L.tx, -L.ty);
+      let y = L.ty;
+      text(ctx, 'Dear Gabie,', L.tx, y, { size: PORT ? 38 : 32, font: DISPLAY, italic: true, weight: 600, color: '#33201a' }); y += PORT ? 46 : 40;
+      const shown = Math.floor(clamp((t - 2.2) * 40, 0, CARD_MSG.length));
+      y += para(ctx, CARD_MSG.slice(0, shown), L.tx, y, L.tw, { size: PORT ? 22 : 18, color: '#3a3034', weight: 500, lh: PORT ? 30 : 25 }) + 18;
+      if (t > 4.6) {
+        ctx.globalAlpha = a * clamp((t - 4.6) * 3, 0, 1);
+        text(ctx, 'with love from', L.tx, y, { size: PORT ? 24 : 20, font: DISPLAY, italic: true, weight: 600, color: '#6a5a60' }); y += PORT ? 36 : 30;
+        const nm = 'SAMANTHA, MONA & GEORGE', nfs = PORT ? 18 : 15; text(ctx, nm, L.tx, y, { size: nfs, weight: 600, color: '#33201a', track: 4 });
+        // Mona's paw as a tiny red seal after the names
+        const pw = textW(nm, nfs, 600, null, 4), px = L.tx + pw / 2 + 22; circ(ctx, px, y, 13); fillP(ctx, '#c8102e'); drawPaw(ctx, px, y + 1, .62, '#fbf8f3');
+        y += PORT ? 30 : 26; this.textBottom = y; text(ctx, 'CHRISTMAS 2026', L.tx, y, { size: PORT ? 13 : 11, weight: 500, color: '#8a7f78', track: 5 });
+      }
+      ctx.restore();
+    }
+    soundBtn(); iconBtn('home', 34 + SAFE.l, 40 + SAFE.t, 22, glyphBack, () => go('title'));
+    if (sceneT < CARD_INTRO + .9) drawGiftWrapIntro(sceneT);
+    if (this.p.declined && t < 6) { ctx.globalAlpha = clamp(3 - t / 2, 0, 1); pill('You declined the panic appointment… Mona says hi anyway.', W / 2, H - SAFE.b - 120, { size: 14 }); ctx.globalAlpha = 1; }
+    if (t > 5.2) {
+      ctx.globalAlpha = clamp((t - 5.2) * 2, 0, 1);
+      const bw = Math.min(W - 60, 380) / 2 - 8, bh = PORT ? 56 : 48, by = PORT ? Math.min(H - SAFE.b - bh - 34, (this.textBottom || L.ty + 240) + 56) : H - SAFE.b - bh - 18, bx = L.tx;
+      xmasBtn('again', bx - bw - 10, by - 6, bw, bh, 'Play again', () => go('title'), 'candy');
+      xmasBtn('arc', bx + 10, by + 8, bw, bh, 'Arcade', () => go('arcade', { next: null }), 'arcade');
+      ctx.globalAlpha = 1;
+      if (!this.tapped && t < 16) { ctx.globalAlpha = .6 + .4 * Math.sin(TT * 3); pill('Tap the letters to play Jingle Bells!', L.gx + L.gw * .36, L.gy - 26, { size: 15, bg: 'rgba(51,32,26,.88)' }); ctx.globalAlpha = 1; }
+    }
+  }
+};
 
 
 /* =================== Arcade shared: frame, controls, sprites =================== */

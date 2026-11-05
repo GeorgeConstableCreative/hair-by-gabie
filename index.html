@@ -3209,7 +3209,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v132';
+const GAME_VERSION = 'v133';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -3860,7 +3860,6 @@ function scriptNeonSign(cx, w, t) {
   });
   // a gold swash underline
   const ul = tubeLit('under', .4 + total * .13, t), uy = y2 + s2 * .2;
-  neonTube(ul, '#ffd000', Math.max(2, s2 * .04), () => { ctx.beginPath(); ctx.moveTo(cx - w * .3, uy + 6); ctx.bezierCurveTo(cx - w * .1, uy - 8, cx + w * .12, uy + 10, cx + w * .34, uy - 6); });
   ctx.restore();
   return uy + 14;
 }

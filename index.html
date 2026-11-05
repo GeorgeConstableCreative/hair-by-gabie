@@ -3185,7 +3185,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v117';
+const GAME_VERSION = 'v118';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -5730,6 +5730,7 @@ ARC_PREVIEW.inv = function (x, y, w, h) {
 const JJ = {
   BPM: 66, TRAVEL: 5, LEAD: 3,
   WIN: { perfect: .08, great: .15, good: .22, early: .6 }, // early: you can tap a little ahead of the line and still play the note
+  SPEEDS: [.7, .85, 1, 1.15, 1.3], SPEED_NAMES: ['Very slow', 'Slow', 'Normal', 'Fast', 'Very fast'],
   MINGAP: 2, // the chart only uses notes at least this many eighth-notes apart, so no rapid-fire runs
   COLS: ['#ff4a55', '#ffc928', '#2fd37a', '#3d8bff'],
   KEYS: [['d', '1', 'arrowleft'], ['f', '2', 'arrowdown'], ['j', '3', 'arrowup'], ['k', '4', 'arrowright']],
@@ -5751,24 +5752,29 @@ SCENES.beats = {
   pausable: true,
   enter(p) {
     this.lastParams = p; playTrack(null);
-    this.st = { params: p, ph: 'ready', notes: (() => { let last = -99; return JJ_SONG.notes.map(n => { const extra = n.step - last < JJ.MINGAP; if (!extra) last = n.step; return { ...n, extra }; }); })().map(n => ({ ...n, t: n.step * jjStep(), hit: null })), lvl: 0, travel: JJ.TRAVEL, score: 0, streak: 0, best: 0, cheer: .6, judged: [], laneFx: [0, 0, 0, 0], held: {}, counts: { perfect: 0, great: 0, good: 0, miss: 0 }, nextStep: 0 };
+    this.st = { params: p, ph: 'ready', notes: (() => { let last = -99; return JJ_SONG.notes.map(n => { const extra = n.step - last < JJ.MINGAP; if (!extra) last = n.step; return { ...n, extra }; }); })().map(n => ({ ...n, t: n.step * jjStep(), hit: null })), lvl: 0, travel: JJ.TRAVEL, uSpeed: (save.jjSpeed != null ? save.jjSpeed : 2), adapt: 1, rate: 1, s0: 0, ta: 0, score: 0, streak: 0, best: 0, cheer: .6, judged: [], laneFx: [0, 0, 0, 0], held: {}, counts: { perfect: 0, great: 0, good: 0, miss: 0 }, nextStep: 0 };
     this.kh = e => this.rawKey(e, true); this.ku = e => this.rawKey(e, false);
     window.addEventListener('keydown', this.kh, true); window.addEventListener('keyup', this.ku, true);
   },
   exit() { window.removeEventListener('keydown', this.kh, true); window.removeEventListener('keyup', this.ku, true); if (AU.c && AU.c.state === 'suspended' && this.st && this.st.susp) AU.c.resume(); },
   // ---- the clock ----
   lat() { return AU.c ? (AU.c.outputLatency || AU.c.baseLatency || 0) : 0; },
-  now() { const st = this.st; return AU.c ? AU.c.currentTime - st.t0 - this.lat() : performance.now() / 1000 - st.t0; },
+  real() { return AU.c ? AU.c.currentTime - this.lat() : performance.now() / 1000; },
+  now() { const st = this.st; return st.s0 + (this.real() - st.ta) * st.rate; },
+  // speed = your chosen setting x a gentle auto-adjust (up while you keep up, down when you miss)
+  speed() { const st = this.st; return JJ.SPEEDS[st.uSpeed] * st.adapt; },
+  setRate(r) { const st = this.st; if (st.ph !== 'play') { st.rate = r; return; } const R = this.real(); st.s0 = this.now(); st.ta = R; st.rate = r; },
+  audioAt(x) { const st = this.st; return st.ta + (x - st.s0) / st.rate + this.lat(); }, // audio-clock time a song moment is scheduled at
   begin() {
     const st = this.st; if (st.ph !== 'ready') return; audioInit();
-    st.t0 = (AU.c ? AU.c.currentTime : performance.now() / 1000) + JJ.LEAD; st.ph = 'play'; st.nextStep = 0; sfx('power');
+    st.ta = this.real(); st.s0 = -JJ.LEAD; st.rate = this.speed(); st.ph = 'play'; st.nextStep = 0; sfx('power');
   },
   // ---- backing track, scheduled just ahead on the audio clock ----
   schedule() {
     const st = this.st; if (!AU.c || st.ph !== 'play') return;
-    const sd = jjStep(), horizon = AU.c.currentTime + .18;
-    while (st.nextStep < JJ_SONG.steps && st.t0 + st.nextStep * sd < horizon) {
-      const s = st.nextStep, t = st.t0 + s * sd, i = s % 6, bar = Math.floor(s / 6);
+    const sd = jjStep() / st.rate, horizon = AU.c.currentTime + .18;
+    while (st.nextStep < JJ_SONG.steps && this.audioAt(st.nextStep * jjStep()) < horizon) {
+      const s = st.nextStep, t = this.audioAt(s * jjStep()), i = s % 6, bar = Math.floor(s / 6);
       if (t >= AU.c.currentTime - .01) {
         if (i % 2 === 0) I.kick(t, i === 0 ? .85 : .55);
         if (i === 2 || i === 4) I.clap(t, .12);
@@ -5787,7 +5793,7 @@ SCENES.beats = {
   down(x, y, id) { if (this.st.ph === 'ready') { this.begin(); return; } const l = this.laneAt(x); this.st.held['p' + id] = l; this.press(l); },
   up(x, y, s, id) { delete this.st.held['p' + id]; },
   holdTap() { this.begin(); },
-  key(k) { if (k === 'a' || k === 'enter') this.begin(); },
+  key(k) { if (k === 'a' || k === 'enter') this.begin(); if (k === '[' || k === '-') this.setSpeed(this.st.uSpeed - 1); if (k === ']' || k === '=') this.setSpeed(this.st.uSpeed + 1); },
   rawKey(e, isDown) {
     if (paused || !scene || scene !== this) return;
     const k = (e.key || '').toLowerCase(), l = JJ.KEYS.findIndex(ks => ks.includes(k)); if (l < 0) return;
@@ -5801,15 +5807,16 @@ SCENES.beats = {
   zoneEnd(now) { const per = jjStep() * 2; return Math.ceil((now + .001) / per) * per; },
   press(l) {
     const st = this.st; if (st.ph !== 'play') return;
-    st.laneFx[l] = 1; const now = this.now(), early = Math.max(JJ.WIN.good, this.zoneEnd(now) - now + .04);
-    let best = null; for (const n of st.notes) { if (n.hit || n.lane !== l) continue; const d = n.t - now; if (d <= early && d >= -JJ.WIN.good && (!best || Math.abs(d) < Math.abs(best.t - now))) best = n; if (d > early) break; }
+    st.laneFx[l] = 1; const now = this.now(), rt = st.rate, early = Math.max(JJ.WIN.good * rt, this.zoneEnd(now) - now + .04 * rt);
+    let best = null; for (const n of st.notes) { if (n.hit || n.lane !== l) continue; const d = n.t - now; if (d <= early && d >= -JJ.WIN.good * rt && (!best || Math.abs(d) < Math.abs(best.t - now))) best = n; if (d > early) break; }
     if (!best) { st.streak = 0; st.cheer = Math.max(0, st.cheer - .015); return; } // a stray tap: no penalty beyond breaking the streak
-    const err = Math.abs(best.t - now), grade = err <= JJ.WIN.perfect ? 'perfect' : err <= JJ.WIN.great ? 'great' : 'good';
+    const err = Math.abs(best.t - now) / rt, grade = err <= JJ.WIN.perfect ? 'perfect' : err <= JJ.WIN.great ? 'great' : 'good';
     best.hit = grade; st.counts[grade]++; st.streak++; st.best = Math.max(st.best, st.streak);
     const mult = Math.min(4, 1 + Math.floor(st.streak / 10));
-    st.score += { perfect: 100, great: 70, good: 40 }[grade] * mult; st.cheer = Math.min(1, st.cheer + .035);
+    st.score += Math.round({ perfect: 100, great: 70, good: 40 }[grade] * mult * this.speed()); st.cheer = Math.min(1, st.cheer + .035);
+    if (st.streak >= 4) st.adapt = Math.min(1.18, st.adapt + .008); // keeping up: nudge the tempo up a touch
     // the melody note sounds when you hit it (miss it and it's silent), so you hear yourself play the tune
-    if (AU.c) { const t = AU.c.currentTime + .005; I.bell(t, best.m + 12, jjStep() * best.len * 1.2, .13); osc('square', mtof(best.m), t, jjStep() * best.len, .035, AU.mg, { lp: 2400, s: .5, r: .08 }); }
+    if (AU.c) { const t = AU.c.currentTime + .005; I.bell(t, best.m + 12, jjStep() / rt * best.len * 1.2, .13); osc('square', mtof(best.m), t, jjStep() / rt * best.len, .035, AU.mg, { lp: 2400, s: .5, r: .08 }); }
     st.judged.push({ lane: l, txt: { perfect: 'PERFECT!', great: 'GREAT!', good: 'GOOD' }[grade], col: { perfect: '#ffd34d', great: '#9ff3e6', good: '#ffffff' }[grade], t: 0 });
     if (st.streak && st.streak % 10 === 0 && mult <= 4) st.judged.push({ lane: -1, txt: mult < 4 ? 'STREAK ×' + mult + '!' : 'ON FIRE! ×4', col: '#ff8ad0', t: 0 });
     const g = this.geo(); for (let i = 0; i < (grade === 'perfect' ? 10 : 5); i++) spawn('sparkle', this.laneX(g, l, g.hitY), g.hitY);
@@ -5823,16 +5830,35 @@ SCENES.beats = {
     const now = this.now();
     // as you improve, the game speeds up: the tools slide down faster and the quick in-between notes join the chart
     { const lv = st.streak >= 32 ? 3 : st.streak >= 18 ? 2 : st.streak >= 8 ? 1 : 0;
-      if (lv > st.lvl) { st.lvl = lv; st.judged.push({ lane: -1, txt: ['', 'SPEED UP!', 'FASTER!', 'MAX SPEED!'][lv], col: '#9ff3e6', t: 0 }); sfx('power'); }
+      if (lv > st.lvl) { st.lvl = lv; if (lv === 2) { st.judged.push({ lane: -1, txt: 'MORE NOTES!', col: '#9ff3e6', t: 0 }); sfx('power'); } }
       else if (lv < st.lvl && st.streak === 0) st.lvl = Math.max(0, st.lvl - 1);
-      st.travel = lerp(st.travel, JJ.TRAVEL * [1, .86, .74, .64][st.lvl], 1 - Math.exp(-1.5 * dt));
+      st.travel = JJ.TRAVEL;
+      // ease the clock toward the target speed so changes feel smooth
+      { const tgt = this.speed(); if (Math.abs(tgt - st.rate) > .002) this.setRate(lerp(st.rate, tgt, 1 - Math.exp(-2.5 * dt))); }
       for (const n of st.notes) { if (n.t - now > st.travel + .2) break; if (n.extra && n.hit == null && n.on == null) { n.on = st.lvl >= 2; if (!n.on) n.hit = 'skip'; } } }
-    for (const n of st.notes) if (!n.hit && now - n.t > JJ.WIN.good) { n.hit = 'miss'; st.counts.miss++; st.streak = 0; st.cheer = Math.max(0, st.cheer - .07); st.judged.push({ lane: n.lane, txt: 'MISS', col: '#ff7a7a', t: 0 }); }
+    for (const n of st.notes) if (!n.hit && now - n.t > JJ.WIN.good * st.rate) { n.hit = 'miss'; st.counts.miss++; st.streak = 0; st.adapt = Math.max(.86, st.adapt - .035); st.cheer = Math.max(0, st.cheer - .07); st.judged.push({ lane: n.lane, txt: 'MISS', col: '#ff7a7a', t: 0 }); }
     if (st.cheer <= 0) { st.ph = 'over'; st.endT = 0; finishArcade('beats', st.score); sfx('fail'); return; }
     if (now > JJ_SONG.steps * jjStep() + .4) {
       const tot = st.notes.filter(n => n.hit !== 'skip').length, acc = (st.counts.perfect + st.counts.great * .8 + st.counts.good * .5) / tot;
       st.acc = acc; st.ph = 'win'; st.endT = 0; finishArcade('beats', st.score); sfx('win'); for (let i = 0; i < 40; i++) spawn('confetti', W / 2, H * .3);
     }
+  },
+  // speed controller under the fretboard: − / + with five steps, and a live readout of the actual speed
+  setSpeed(i) { const st = this.st; st.uSpeed = clamp(i, 0, JJ.SPEEDS.length - 1); save.jjSpeed = st.uSpeed; persist(); sfx('click'); st.speedPop = 0; },
+  drawSpeed(g) {
+    const st = this.st, GA = g.GA, y = Math.min(H - SAFE.b - 32, GA.y + GA.h + 32), w = Math.min(GA.w, 340), x = W / 2 - w / 2, h = 58;
+    st.speedPop = (st.speedPop == null ? 1 : st.speedPop + 1 / 60);
+    rr(ctx, x, y - h / 2, w, h, 24); fillP(ctx, 'rgba(20,12,40,.92)'); strokeP(ctx, 'rgba(255,255,255,.18)', 1.5);
+    const rb = 22, minus = x + 6 + rb, plus = x + w - 6 - rb;
+    const round = (id, cx, lbl, en, cb) => UI.button(id, cx - rb - 4, y - rb - 4, rb * 2 + 8, rb * 2 + 8, () => { circ(ctx, cx, y, rb); fillP(ctx, en ? '#ff8ad0' : 'rgba(255,255,255,.12)'); text(ctx, lbl, cx, y + 1, { size: 24, weight: 700, color: en ? '#1b0d3a' : 'rgba(255,255,255,.35)' }); }, () => en && cb());
+    round('jjslow', minus, '−', st.uSpeed > 0, () => this.setSpeed(st.uSpeed - 1));
+    round('jjfast', plus, '+', st.uSpeed < JJ.SPEEDS.length - 1, () => this.setSpeed(st.uSpeed + 1));
+    // five pips for the chosen setting
+    const pipW = 14, gap = 6, pw = JJ.SPEEDS.length * pipW + (JJ.SPEEDS.length - 1) * gap, px0 = W / 2 - pw / 2;
+    for (let i = 0; i < JJ.SPEEDS.length; i++) { const on = i <= st.uSpeed, k = i === st.uSpeed ? 1 + .25 * Math.max(0, 1 - st.speedPop * 4) : 1; rr(ctx, px0 + i * (pipW + gap), y - 2 - 4 * k, pipW, 8 * k, 4); fillP(ctx, on ? ['#3d8bff', '#2fd37a', '#ffc928', '#ff8a3a', '#ff4a55'][i] : 'rgba(255,255,255,.15)'); }
+    text(ctx, 'SPEED · ' + JJ.SPEED_NAMES[st.uSpeed].toUpperCase(), W / 2, y - 17, { size: 9, font: PIXEL, weight: 400, color: 'rgba(255,255,255,.75)' });
+    const live = st.ph === 'play' ? st.rate : this.speed(), arrow = st.adapt > 1.015 ? ' ▲' : st.adapt < .985 ? ' ▼' : '';
+    text(ctx, live.toFixed(2) + '×' + arrow, W / 2, y + 18, { size: 10, font: PIXEL, weight: 400, color: arrow === ' ▲' ? '#9ff3e6' : arrow ? '#ffb3a8' : 'rgba(255,255,255,.6)' });
   },
   // ---- layout: a stage with four lanes in gentle perspective ----
   geo() {
@@ -5919,7 +5945,7 @@ SCENES.beats = {
       if (st.ph === 'play' && now < 12 * jjStep()) { const c = 4 - Math.floor(Math.max(0, now + JJ.LEAD) / (jjStep() * 3)); if (now > -JJ.LEAD + .2) { const cj = jiggle(((now + JJ.LEAD) % (jjStep() * 3)), c); ctx.save(); ctx.translate(g.cx, GA.y + GA.h * .4); ctx.scale(cj.sx, cj.sy); text(ctx, now < 0 ? 'GET READY' : 'HERE WE GO!', 0, 0, { size: 16, font: PIXEL, weight: 400, color: '#ffd34d', stroke: '#120a2a', sw: 6 }); ctx.restore(); } }
       if (st.ph === 'ready') readyOverlay(GA, 'JINGLE JAM', ['Hit the salon tools on the line.', 'Keep the streak going!']);
     });
-    controls('beats', g.GA);
+    this.drawSpeed(g);
     if (st.ph === 'over') arcadeEnd(st, 'beats', false, ['The crowd went home early.', 'Score: ' + st.score]);
     if (st.ph === 'win') arcadeEnd(st, 'beats', true, ['Accuracy ' + Math.round((st.acc || 0) * 100) + '%  ·  Best streak ' + st.best, 'Score: ' + st.score]);
   }

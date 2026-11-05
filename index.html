@@ -3209,7 +3209,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v129';
+const GAME_VERSION = 'v130';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -4558,8 +4558,6 @@ SCENES.card = {
     // a dark winter night: deep indigo sky, a glowing moon, twinkling stars and snowy hills
     { const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#070b22'); sky.addColorStop(.55, '#131c45'); sky.addColorStop(1, '#22305e'); ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
       const r0 = mulberry(21); for (let i = 0; i < 70; i++) { const x = r0() * W, y = r0() * H * .8, sz = 1 + r0() * 2.2; ctx.globalAlpha = .35 + .65 * Math.abs(Math.sin(TT * (.7 + r0() * 1.8) + i)); drawStar(ctx, x, y, sz, '#fff6d8', 4); } ctx.globalAlpha = 1;
-      const mx = W - SAFE.r - 70, my = SAFE.t + 110, mg = ctx.createRadialGradient(mx, my, 10, mx, my, 120); mg.addColorStop(0, 'rgba(255,240,200,.35)'); mg.addColorStop(1, 'rgba(255,240,200,0)'); ctx.fillStyle = mg; ctx.fillRect(mx - 120, my - 120, 240, 240);
-      ctx.beginPath(); ctx.arc(mx, my, 26, Math.PI * .28, Math.PI * 1.72, false); ctx.arc(mx + 11, my - 4, 23, Math.PI * 1.62, Math.PI * .38, true); ctx.closePath(); fillP(ctx, '#fff4cf');
       const gl = ctx.createRadialGradient(L.gx + L.gw / 2, L.gy + L.gw / 2, 10, L.gx + L.gw / 2, L.gy + L.gw / 2, L.gw * .9); gl.addColorStop(0, 'rgba(255,200,140,.18)'); gl.addColorStop(1, 'rgba(255,200,140,0)'); ctx.fillStyle = gl; ctx.fillRect(0, 0, W, H);
       const hy = H - SAFE.b - 70; ctx.fillStyle = '#2c3d70'; ctx.beginPath(); ctx.moveTo(0, hy); for (let x = 0; x <= W; x += 20) ctx.lineTo(x, hy - 26 - Math.sin(x * .011 + 1) * 16); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill();
       ctx.fillStyle = '#dfe8ff'; ctx.beginPath(); ctx.moveTo(0, hy + 30); for (let x = 0; x <= W; x += 20) ctx.lineTo(x, hy + 22 - Math.sin(x * .008) * 10); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.fill(); }

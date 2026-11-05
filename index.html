@@ -1624,33 +1624,42 @@ function drawGabieSide(g, x, y, s, o) {
 /* '80s big perm: a wide, round cloud of tight spiral curls, lumpy at the edge, glossy at the crown */
 function permCloud(g, hs, G, C, maxB) {
   const fz = hs.frizz.reduce((a, b) => a + b, 0) / HN + hs.wild;
-  // the silhouette follows the cut (so trimming still works), puffed out with springy lumps all round
-  const ol = hairOutline(G, 16), cx = 0, cy = (G.domeY + maxB) / 2, lumps = [];
+  // big '80s volume: the silhouette still follows the cut (so trimming works), but the sides are pushed out wide
+  // and the whole shape is built from fat, springy ringlet clumps, each shaded like a little coiled ball
+  const ol = hairOutline(G, 18), cy = (G.domeY + maxB) / 2, lumps = [];
   for (let i = 0; i < ol.length; i++) {
-    const [x, y] = ol[i], dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy) || 1;
-    const r = 12 + (i % 3) * 2.5 + fz * 6 + Math.sin(i * 2.7 + TT * 2) * fz * 2;
-    lumps.push([x + dx / d * 5, y + dy / d * 5, r]);
-    if (i < ol.length - 1) { const [x2, y2] = ol[i + 1]; lumps.push([(x + x2) / 2 + dx / d * 3, (y + y2) / 2 + dy / d * 3, r * .8]); }
+    const [x, y] = ol[i], dx = x, dy = y - cy, d = Math.hypot(dx, dy) || 1, side = clamp(Math.abs(dx) / (G.halfTop + 1), 0, 1.4);
+    const push = 6 + side * 12 + fz * 5, r = 14 + (i % 3) * 2 + side * 3 + fz * 5 + Math.sin(i * 2.7 + TT * 2) * fz * 1.6;
+    lumps.push([x + dx / d * push, y + dy / d * push * .6, r]);
+    if (i < ol.length - 1) { const [x2, y2] = ol[i + 1]; lumps.push([(x + x2) / 2 + dx / d * push * .8, (y + y2) / 2 + dy / d * push * .5, r * .85]); }
   }
+  const ball = (x, y, r, i) => {
+    circ(g, x, y, r); g.fillStyle = C.base; g.fill();
+    g.lineCap = 'round';
+    g.beginPath(); g.arc(x, y, r * .74, .15, 2.1); g.strokeStyle = C.dark; g.globalAlpha = .7; g.lineWidth = r * .34; g.stroke();
+    g.beginPath(); g.arc(x - r * .12, y - r * .14, r * .5, 3.5, 5.5); g.strokeStyle = C.hi; g.globalAlpha = .85; g.lineWidth = r * .22; g.stroke();
+    g.beginPath(); g.arc(x + r * .05, y + r * .05, r * .26, i, i + 4.2); g.strokeStyle = C.dark; g.globalAlpha = .55; g.lineWidth = 1.6; g.stroke();
+    g.globalAlpha = 1;
+  };
   g.save();
-  g.fillStyle = OUT; for (const [x, y, r] of lumps) { circ(g, x, y, r + 2.6); g.fill(); }
-  hairPath(g, G); g.lineWidth = 5; g.strokeStyle = OUT; g.stroke();
-  const gr = g.createRadialGradient(-G.halfTop * .3, G.domeY + 20, 6, 0, cy, Math.max(G.halfTop * 1.6, maxB - G.domeY));
-  gr.addColorStop(0, C.light); gr.addColorStop(.5, C.base); gr.addColorStop(1, C.dark);
-  g.fillStyle = gr; for (const [x, y, r] of lumps) { circ(g, x, y, r); g.fill(); }
-  hairPath(g, G); g.fill();
-  // tight spiral curls, clipped to the lumps and to the body of the hair (same seed so they line up)
-  const curls = () => { const rnd = mulberry(5); g.lineCap = 'round'; const L = -G.halfTop - 60, R = G.halfTop + 60;
-    for (let y = G.domeY - 20, row = 0; y < maxB + 24; y += 8.5, row++) for (let x = L + (row % 2) * 5; x < R; x += 10) {
-      const a0 = rnd() * TAU, r = 3 + rnd() * 1.4, light = rnd() < .45;
-      g.beginPath(); for (let s = 0; s <= 14; s++) { const a = a0 + s * .42, rr = r * (.35 + s / 14 * .65); g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.strokeStyle = light ? C.hi : C.dark; g.globalAlpha = light ? .75 : .55; g.lineWidth = 1.8; g.stroke();
-    } g.globalAlpha = 1; };
-  g.save(); hairPath(g, G); g.clip(); curls(); g.restore();
-  g.save(); g.beginPath(); for (const [x, y, r] of lumps) { g.moveTo(x + r, y); g.arc(x, y, r, 0, TAU); } g.clip(); hairPath(g, G); g.fillStyle = 'rgba(0,0,0,0)'; curls(); g.restore();
-  g.restore();
-  // glossy crown and a little hairspray sparkle
+  // ink outline round the whole cloud
+  g.fillStyle = OUT; for (const [x, y, r] of lumps) { circ(g, x, y, r + 2.8); g.fill(); }
+  hairPath(g, G); g.lineWidth = 5.5; g.strokeStyle = OUT; g.stroke();
+  // the bumpy rim: every clump its own ringlet
+  lumps.forEach(([x, y, r], i) => ball(x, y + Math.sin(TT * 2.2 + i) * fz * 1.2, r, i * 1.7));
+  // the body, packed with ringlets row by row (lower rows overlap upper ones, like stacked curls)
+  hairPath(g, G); g.fillStyle = C.dark; g.fill();
   g.save(); hairPath(g, G); g.clip();
-  g.globalAlpha = .3 * (hs.shine == null ? 1 : hs.shine); g.beginPath(); g.ellipse(-G.halfTop * .25, G.domeY + 18, G.halfTop * .55, 10, -.15, 0, TAU); g.fillStyle = '#ffffff'; g.fill();
+  { const rnd = mulberry(7), L = -G.halfTop - 70, R = G.halfTop + 70;
+    for (let y = G.domeY - 16, row = 0; y < maxB + 26; y += 12.5, row++) for (let x = L + (row % 2) * 8; x < R; x += 16) {
+      const jx = (rnd() - .5) * 5, jy = (rnd() - .5) * 4, r = 9.5 + rnd() * 2.5, k = rnd();
+      ball(x + jx, y + jy + Math.sin(TT * 2 + x * .05 + row) * fz * 1.2, r, k * TAU);
+    } }
+  // soft shade under the crown and a glossy hairspray sheen across the top
+  const gr = g.createLinearGradient(0, G.domeY, 0, maxB + 20); gr.addColorStop(0, 'rgba(255,255,255,.12)'); gr.addColorStop(.6, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.18)');
+  g.fillStyle = gr; g.fillRect(-G.halfTop - 90, G.domeY - 30, G.halfTop * 2 + 180, maxB - G.domeY + 80);
+  g.globalAlpha = .28 * (hs.shine == null ? 1 : hs.shine); g.beginPath(); g.ellipse(-G.halfTop * .25, G.domeY + 18, G.halfTop * .55, 10, -.15, 0, TAU); g.fillStyle = '#ffffff'; g.fill();
+  g.restore();
   g.restore(); g.globalAlpha = 1;
 }
 /* teased, curly '80s bangs: a row of springy puffs across the forehead */
@@ -2063,53 +2072,44 @@ function typingDots(x, y, t) {
   ctx.restore();
 }
 function chatDraw(st, dt) {
+  // a chat is a real chat: Samantha says something in a speech bubble, you pick Gabie's reply,
+  // Gabie says it out loud in her bubble, and Samantha reacts in hers
   const b = st.busy; if (!b || b.type !== 'chat') return;
   b.t += dt; if (b.answered) b.aT += dt;
-  const TYPE = .7, gotMsg = b.t > TYPE, pw = Math.min(W - 24, 520), px = W / 2 - pw / 2; b.ph = lerp(b.ph || 404, b.answered ? 300 : 404, 1 - Math.exp(-6 * dt)); const ph = b.ph, py = H - ph - 14 - SAFE.b;
-  if (b.answered && b.aT > 3.1) { st.busy = null; st.gabSay = null; st.samExpr = 'smile'; if (b.onDone) b.onDone(); return; }
-  if (!b.answered && b.t > TYPE + .2 && !b.saidSfx) { b.saidSfx = true; sfx('pop'); }
-  const pk = E.back(clamp(b.t * 3, 0, 1));
-  ctx.save(); ctx.translate(W / 2, py + ph); ctx.scale(1, pk); ctx.translate(-W / 2, -py - ph);
-  panel(px, py, pw, ph, 'rgba(244,238,232,.98)', 26);
-  closeX('chatx', px, py, pw, () => { st.busy = null; st.gabSay = null; st.samExpr = 'smile'; if (b.onDone) b.onDone(); }, { r: 17, inset: 12 });
-  // header: Samantha's little avatar + name, like a messages thread
-  { const ax = px + 34, ay = py + 32; ctx.save(); circ(ctx, ax, ay, 18); ctx.clip(); fillP(ctx, '#e8c4c6'); drawSamPortrait(ctx, ax, ay + 6, .17, st.hs, { expr: 'smile' }); ctx.restore(); circ(ctx, ax, ay, 18); strokeP(ctx, '#fff', 2);
-    text(ctx, 'Samantha', ax + 28, ay - 6, { size: 18, weight: 600, color: LUX.ink, align: 'left' });
-    text(ctx, b.answered ? 'in the chair' : 'in the chair · waiting for your reply', ax + 28, ay + 14, { size: 13, weight: 500, color: LUX.taupe, align: 'left' });
-    if (!b.answered) { const left = clamp(1 - b.t / b.dur, 0, 1), bw = 80, bx = px + pw - bw - 64; rr(ctx, bx, ay - 4, bw, 8, 4); fillP(ctx, 'rgba(28,21,23,.1)'); rr(ctx, bx, ay - 4, Math.max(8, bw * left), 8, 4); fillP(ctx, left > .35 ? LUX.champagne : '#e8803c'); } }
-  line(ctx, px + 16, py + 62, px + pw - 16, py + 62, 'rgba(28,21,23,.08)', 1.5);
-  // the thread
-  let y = py + 80; const maxW = pw * .78;
-  if (!gotMsg) typingDots(px + 22, y, b.t);
-  else y += chatBubble(px + 22, y, maxW, b.q[0], false, b.t - TYPE, { tap: b.answered && b.aT > 2.1 ? (b.zoned ? '❓' : '😂') : null, tapT: b.aT - 2.1 }) + 12;
+  const end = () => { st.busy = null; st.gabSay = null; st.samSay = null; st.samExpr = 'smile'; if (b.onDone) b.onDone(); };
+  if (!b.said) { b.said = true; st.samSay = { msg: b.q[0], t: 0 }; st.samExpr = 'talk'; }
   if (b.answered) {
-    y += chatBubble(px + pw - 22, y, maxW, b.answered, true, b.aT) + 4;
-    if (b.aT > .4) text(ctx, 'Delivered', px + pw - 26, y + 8, { size: 12, color: LUX.taupe, weight: 500, align: 'right' }); y += 22;
-    if (b.aT > .7 && b.aT < 1.6) typingDots(px + 22, y, b.aT);
-    else if (b.aT >= 1.6) chatBubble(px + 22, y, maxW, b.zoned ? 'Hello?? Earth to Gabie 👋' : b.react, false, b.aT - 1.6);
+    if (b.aT > 1.4 && !b.reacted) { b.reacted = true; st.samSay = { msg: b.zoned ? 'Hello?? Earth to Gabie! 👋' : b.react, t: 0 }; st.samExpr = b.zoned ? 'grump' : 'laugh'; sfx('pop'); }
+    if (b.aT > 3.2) { end(); return; }
+    return;
   }
-  ctx.restore();
-  // quick replies: pink-outlined bubbles stacked on the right, popping in one after another
-  if (gotMsg && !b.answered && pk >= 1) {
-    const qy0 = py + ph - 16 - 3 * 56 - 2 * 10;
-    text(ctx, 'Reply as Gabie', px + pw - 24, qy0 - 16, { size: 13, color: LUX.rose, weight: 600, align: 'right', track: 1 });
-    b.q[1].forEach((a, i) => {
-      const tt = b.t - TYPE - .25 - i * .1; if (tt <= 0) return;
-      const fs = 18, w = Math.min(pw - 44, textW(a, fs, 500) + 40), bx = px + pw - 22 - w, by = qy0 + i * 66, k = E.back(clamp(tt * 4, 0, 1)), j = jiggle(tt, i * 1.4 + .4);
-      UI.button('ans' + i, bx, by, w, 56, () => {
-        ctx.save(); ctx.translate(bx + w, by + 28); ctx.rotate(j.rot * .5); ctx.scale(k * j.sx, k * j.sy); ctx.translate(-bx - w, -by - 28);
-        rr(ctx, bx, by, w, 56, 28); fillP(ctx, '#ffffff'); strokeP(ctx, '#d94f8c', 2.4);
-        text(ctx, a, bx + w / 2, by + 29, { size: fs, color: '#9e3d5a', weight: 600 });
-        ctx.restore();
-      }, () => {
-        b.answered = a; b.aT = 0; st.gabSay = null; st.samExpr = 'laugh'; st.chats = (st.chats || 0) + 1; sfx('whoosh');
-        spawn('heart', toScreen(ROOM.RSX, ROOM.RSY).x, toScreen(ROOM.RSX, ROOM.RSY).y, 3);
-      });
+  if (b.t > b.dur) { b.answered = 'Sorry, what? I zoned out! 😅'; b.zoned = true; b.aT = 0; st.gabSay = { msg: b.answered, t: 0 }; st.samSay = null; st.samExpr = 'grump'; if (st.onZone) st.onZone(); return; }
+  if (b.t < .5) return;
+  // reply card along the bottom: three answers to choose from, with a little timer
+  const n = b.q[1].length, bh = 58, gap = 10, pw = Math.min(W - 24, 520), ph = 66 + n * bh + (n - 1) * gap + 16, px = W / 2 - pw / 2, py = H - ph - 14 - SAFE.b;
+  const k = E.back(clamp((b.t - .5) * 3, 0, 1));
+  ctx.save(); ctx.translate(W / 2, py + ph); ctx.scale(1, k); ctx.translate(-W / 2, -py - ph);
+  panel(px, py, pw, ph, 'rgba(255,250,244,.97)', 24);
+  closeX('chatx', px, py, pw, end, { r: 17, inset: 12 });
+  text(ctx, 'Reply as Gabie', px + 22, py + 30, { size: 18, color: LUX.rose, weight: 600, align: 'left' });
+  { const left = clamp(1 - b.t / b.dur, 0, 1), tw = 90, tx = px + 22 + textW('Reply as Gabie', 18, 600) + 16; rr(ctx, tx, py + 25, tw, 10, 5); fillP(ctx, 'rgba(28,21,23,.1)'); rr(ctx, tx, py + 25, Math.max(10, tw * left), 10, 5); fillP(ctx, left > .35 ? LUX.champagne : '#e8803c'); }
+  b.q[1].forEach((a, i) => {
+    const tt = b.t - .7 - i * .1; if (tt <= 0) return;
+    const bx = px + 18, by = py + 56 + i * (bh + gap), w = pw - 36, kk = E.back(clamp(tt * 4, 0, 1)), j = jiggle(tt, i * 1.4 + .4);
+    UI.button('ans' + i, bx, by, w, bh, () => {
+      ctx.save(); ctx.translate(bx + w / 2, by + bh / 2); ctx.rotate(j.rot * .4); ctx.scale(kk * j.sx, kk * j.sy); ctx.translate(-bx - w / 2, -by - bh / 2);
+      rr(ctx, bx, by + 3, w, bh, bh / 2); fillP(ctx, 'rgba(158,61,90,.25)');
+      rr(ctx, bx, by, w, bh, bh / 2); fillP(ctx, '#ffffff'); strokeP(ctx, '#d94f8c', 2.4);
+      let fs = 18; while (fs > 13 && textW(a, fs, 600) > w - 30) fs--;
+      text(ctx, a, bx + w / 2, by + bh / 2 + 1, { size: fs, color: '#9e3d5a', weight: 600 });
+      ctx.restore();
+    }, () => {
+      b.answered = a; b.aT = 0; st.samSay = null; st.gabSay = { msg: a, t: 0 }; st.samExpr = 'smile'; st.chats = (st.chats || 0) + 1; sfx('whoosh');
+      spawn('heart', toScreen(ROOM.RSX, ROOM.RSY).x, toScreen(ROOM.RSX, ROOM.RSY).y, 3);
     });
-  }
-  if (!b.answered && b.t > b.dur) { b.answered = 'Sorry, what? I zoned out! 😅'; b.zoned = true; b.aT = 0; st.samExpr = 'grump'; if (st.onZone) st.onZone(); }
+  });
+  ctx.restore();
 }
-/* phone overlay */
 function phoneOpen(st, onDone) {
   const c = draw1('call', CALLERS);
   st.busy = { type: 'phone', c, t: 0, onDone }; st.gabExpr = 'surprised'; st.samSay = null;
@@ -2360,11 +2360,11 @@ SCENES.cut = {
     if (st.gabSay) speechBubble(st.gabSay.msg, rg.x, rg.y, { t: st.gabSay.t, bg: '#ffe3f0' });
     if (st.phase === 'intro') { hudTop('The Cut'); return; }
     hudTop('The Cut');
-    const y2 = SAFE.t + 82, mw = Math.min(260, W * .42);
-    meterBar(16 + SAFE.l, y2 - 13, mw, 28, st.match, st.match > .6 ? '#5fe08a' : '#ffb347', 'Style match ' + Math.round(st.match * 100) + '%');
-    cupMeter(W - 158 - SAFE.r, y2 + 1, st.stam); livesDraw(W - 96 - SAFE.r, y2 - 8, st.lives);
-    meterBar(16 + SAFE.l, y2 + 22, mw * .7, 16, st.pile, st.pile > .75 ? '#ff6b6b' : '#c9a27a');
-    text(ctx, 'Floor', 16 + SAFE.l + mw * .7 + 8, y2 + 31, { size: 14, align: 'left', color: '#fff', stroke: 'rgba(0,0,0,.45)', sw: 3 });
+    const y2 = SAFE.t + 84, mw = Math.min(330, W - 200 - SAFE.l - SAFE.r);
+    meterBar(16 + SAFE.l, y2 - 16, mw, 38, st.match, st.match > .6 ? '#5fe08a' : '#ffb347', 'Style match ' + Math.round(st.match * 100) + '%');
+    cupMeter(W - 158 - SAFE.r, y2 + 4, st.stam); livesDraw(W - 96 - SAFE.r, y2 - 5, st.lives);
+    meterBar(16 + SAFE.l, y2 + 30, mw * .74, 26, st.pile, st.pile > .75 ? '#ff6b6b' : '#c9a27a', st.pile > .75 ? 'Sweep soon!' : '');
+    text(ctx, 'Floor', 16 + SAFE.l + mw * .74 + 10, y2 + 44, { size: 19, weight: 600, align: 'left', color: '#fff', stroke: 'rgba(0,0,0,.45)', sw: 4 });
     if (!st.busy && st.phase === 'play') {
       const bw = 150, by = H - 72 - SAFE.b;
       btn('tS', W / 2 - bw - 6, by, bw, 54, 'Scissors', () => { st.tool = 'scissors'; }, { color: st.tool === 'scissors' ? PAL.pinkD : 'rgba(42,34,38,.75)', size: 19 });
@@ -2411,7 +2411,7 @@ SCENES.opening = {
     const s = Math.min((W - 140) / IPH_W, (H - SAFE.t - SAFE.b - 170) / IPH_H), x = W / 2 - IPH_W / 2, y = (H - IPH_H) / 2 + 20;
     const flash = Math.sin(TT * 8) > 0;
     iphoneCall({ x, y, s, anchor: 'c', t, name: 'Samantha', sub: '🚨 PANIC APPOINTMENT', subCol: flash ? '#ff6b6b' : '#ffb3a8', avatarR: 62, tilt: -.06,
-      hint: '"It\'s happening again! Fit me in TODAY??"',
+      hint: '"It\'s happening again! Can you fit me in today?"',
       avatar: (cx, cy, r) => {
         const ss = r / 120, wob = Math.sin(TT * 7) * .07 + Math.sin(TT * 13) * .03, expr = this.spinV > .2 ? 'surprised' : (Math.floor(TT * 2.5) % 2 ? 'eek' : 'surprised');
         if (this.spinV > .05) { ctx.save(); ctx.globalAlpha = this.spinV * .7; ctx.lineCap = 'round'; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(cx, cy + 10 * ss, ss * (120 + k * 16), TT * 8 + k * 2, TT * 8 + k * 2 + 1.4); strokeP(ctx, '#fff', 4 - k); } ctx.restore(); }
@@ -2425,7 +2425,7 @@ SCENES.opening = {
 /* =================== STYLE PICKER =================== */
 SCENES.style = {
   enter(p) { this.lastParams = p; this.picked = null; reach('style'); playTrack('salon'); this.idx = Math.max(0, STYLES.findIndex(s => s.id === save.style)); this.off = 0; this.drag = null; this.hairs = STYLES.map(s => newHair(s.id)); this.grown = 0; },
-  update(dt) { this.grown += dt * .021; if (!this.drag) this.off = lerp(this.off, 0, 1 - Math.exp(-10 * dt)); },
+  update(dt) { this.grown += dt * .045; if (!this.drag) this.off = lerp(this.off, 0, 1 - Math.exp(-10 * dt)); },
   go(d) { this.idx = (this.idx + d + STYLES.length) % STYLES.length; this.off += d * (W * .7); sfx('whoosh'); },
   down(x, y) { this.drag = { x0: x, y0: y, x }; },
   wheel(dx, dy) { if (this.picked) return; if (Math.abs(dx) > Math.abs(dy)) this.go(dx < 0 ? 1 : -1); },
@@ -2444,7 +2444,6 @@ SCENES.style = {
   },
   draw() {
     const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#e9ddd2'); bg.addColorStop(1, '#c8bbae'); ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-    ctx.globalAlpha = .08; for (let i = 0; i < 14; i++) drawScissorsIcon(ctx, (i * 137) % W, (i * 211) % H, 2, PAL.ink, .4); ctx.globalAlpha = 1;
     soundBtn(); iconBtn('back', 34 + SAFE.l, 36 + SAFE.t, 22, glyphBack, () => go('opening'));
     // centre the whole lookbook (heading, card, dots, button, footer) in the space below the nav bar
     const navB = SAFE.t + 64, avail = H - SAFE.b - 16 - navB, cw = Math.min(W * .78, 400);
@@ -2486,8 +2485,12 @@ SCENES.style = {
     for (let i = 0; i < STYLES.length; i++) { circ(ctx, W / 2 + (i - (STYLES.length - 1) / 2) * 20, cy + chh + 30, i === this.idx ? 6 : 4); fillP(ctx, i === this.idx ? PAL.pinkD : 'rgba(58,42,48,.3)'); }
     iconBtn('pl', 30 + SAFE.l, cy + chh / 2, 24, (x, y) => glyphBack(x, y), () => this.go(-1));
     iconBtn('pr', W - 30 - SAFE.r, cy + chh / 2, 24, (x, y) => { ctx.save(); ctx.translate(x, y); ctx.scale(-1, 1); glyphBack(0, 0); ctx.restore(); }, () => this.go(1));
-    xmasBtn('choose', W / 2 - 160, cy + chh + 62, 320, 72, 'Choose this look', () => this.pick(), 'snow');
-    text(ctx, "Meanwhile, Samantha's hair has grown " + this.grown.toFixed(2) + ' in.', W / 2, cy + chh + 166, { size: 15, color: '#6a5a60', weight: 500 });
+    xmasBtn('choose', W / 2 - 160, cy + chh + 62, 320, 72, 'Choose this look', () => this.pick(), 'felt');
+    // a running joke: the longer you browse, the more her hair grows (the number pops each time it ticks up)
+    { const inch = this.grown, tick = Math.floor(inch * 20), pk = this.lastTick === tick ? 0 : 1; this.lastTick = tick; this.tickPop = Math.max(0, (this.tickPop || 0) - 1 / 60) + pk * .25;
+      const msg = inch < .5 ? 'Meanwhile, her hair has grown ' + inch.toFixed(2) + '"' : inch < 1.5 ? 'Hurry! Her hair has grown ' + inch.toFixed(2) + '"!' : 'Pick one! Her hair has grown ' + inch.toFixed(2) + '"!!';
+      const j = jiggle(this.tickPop * 2, 1.3), yy = cy + chh + 172;
+      ctx.save(); ctx.translate(W / 2, yy); ctx.rotate(-.02 + j.rot * .5); ctx.scale(1 + this.tickPop * .25, 1 + this.tickPop * .25); pill('✂ ' + msg, 0, 0, { size: 17, bg: inch < 1.5 ? 'rgba(158,61,90,.92)' : 'rgba(200,40,50,.95)' }); ctx.restore(); }
   }
 };
 
@@ -2865,10 +2868,15 @@ SCENES.wash = {
     if (st.gabSay) speechBubble(st.gabSay.msg, gs.x, gs.y, { t: st.gabSay.t, bg: '#ffe3f0' });
     hudTop('The Wash');
     if (!picking && !st.done) { blissMeter(16 + SAFE.l, SAFE.t + 86, Math.min(240, W * .45), st.bliss); scorePill(st, W - 90 - SAFE.r, SAFE.t + 86); }
-    const stepMsg = { pickS: 'Pick a shampoo', lather: 'Hold on her head to scrub! ' + Math.min(8, st.pops) + '/8', rinse: 'Hold to rinse · keep it comfy', pickC: 'Now pick a conditioner', massage: 'Tap anywhere as each ring closes', rinse2: 'Rinse out the conditioner', towel: 'Towel wrap!', fixing: 'Clarifying wash…', blue: 'Uh-oh…' }[st.step];
+    // every step says what it is, which number it is, and exactly what to do
+    const STEPS = { pickS: [1, 'Choose a shampoo', 'Each one changes how her hair turns out'], lather: [2, 'Scrub the sparkles  ' + Math.min(8, st.pops) + '/8', 'Press and hold on each sparkly spot'], rinse: [3, 'Rinse out the shampoo', 'Hold on her hair · keep the arrow in the green'], pickC: [4, 'Choose a conditioner', ''], massage: [5, 'Scalp massage', 'Tap as each shrinking ring hits its circle'], rinse2: [6, 'Rinse out the conditioner', 'Hold on her hair · keep the arrow in the green'], towel: [0, 'Towel wrap!', ''], fixing: [0, 'Clarifying wash…', ''], blue: [0, 'Uh-oh…', 'Her hair went blue! Fix it, or keep it?'] }[st.step] || [0, '', ''];
+    const stepMsg = STEPS[1];
     if (st.lastStep !== st.step) { st.lastStep = st.step; st.stepPop = 0; } st.stepPop = (st.stepPop || 0) + (dt || .016);
     if (!st.done) { const k = E.back(clamp(st.stepPop * 3, 0, 1)), wob = Math.sin(st.stepPop * 18) * .08 * Math.max(0, 1 - st.stepPop * 1.5); const prodN = this.products().length, pbh = PORT ? 60 : 52, pickY = PORT ? H - SAFE.b - 16 - prodN * (pbh + 12) - 34 : (H - prodN * (pbh + 8)) / 2 + 20 - 34, pbw = Math.min(W - 32, PORT ? 440 : 340), pickX = PORT ? W / 2 : W - pbw / 2 - 20 - SAFE.r;
-      ctx.save(); ctx.translate(picking ? pickX : (PORT ? W / 2 : W * .78), picking ? pickY : (PORT ? SAFE.t + 150 : H * .45)); ctx.scale(k * (1 + .03 * Math.sin(TT * 5)), k); ctx.rotate(wob + Math.sin(TT * 2.4) * .015); pill(stepMsg, 0, 0, { size: picking ? 24 : 21, bg: 'rgba(217,79,140,.96)' }); ctx.restore(); }
+      ctx.save(); ctx.translate(picking ? pickX : (PORT ? W / 2 : W * .78), picking ? pickY : (PORT ? SAFE.t + 150 : H * .45)); ctx.scale(k * (1 + .03 * Math.sin(TT * 5)), k); ctx.rotate(wob + Math.sin(TT * 2.4) * .015); pill(stepMsg, 0, 0, { size: picking ? 24 : 21, bg: 'rgba(217,79,140,.96)' });
+      if (STEPS[0]) { const tg = 'STEP ' + STEPS[0] + ' OF 6', tw = textW(tg, 12, 600) + 22; rr(ctx, -tw / 2, -46, tw, 22, 11); fillP(ctx, 'rgba(28,21,23,.82)'); text(ctx, tg, 0, -34, { size: 12, weight: 600, color: '#ffd38a', track: 2 }); }
+      if (STEPS[2] && !picking) pill(STEPS[2], 0, 42, { size: 16, bg: 'rgba(28,21,23,.78)' });
+      ctx.restore(); }
     if (picking) {
       const bw = Math.min(W - 32, PORT ? 460 : 340), bh = PORT ? 60 : 52, by0 = PORT ? H - SAFE.b - 16 - prods.length * (bh + 12) : (H - prods.length * (bh + 8)) / 2 + 20, bx0 = PORT ? W / 2 - bw / 2 : W - bw - 20 - SAFE.r;
       prods.forEach((pr, i) => choiceBtn('pr' + i, bx0, by0 + i * (bh + (PORT ? 12 : 8)), bw, bh, pr.name.replace(' (careful!)', ''), () => this.pickProd(pr), { i, accent: pr.col, icon: (x, y, r) => { rr(ctx, x - r * .42, y - r * .55, r * .84, r * 1.15, 4); fillP(ctx, '#fff'); strokeP(ctx, LUX.ink, 1.6); rr(ctx, x - r * .2, y - r * .78, r * .4, r * .26, 2); fillP(ctx, LUX.ink); } }));
@@ -3037,8 +3045,11 @@ SCENES.dry = {
     // pistol grip: the dryer points the way her forearm points (straight wrist); nozzle offset follows last frame's arm angle
     // a real blow-dry: hand a steady distance from the hair, the dryer rocking slowly side to side with a little wrist turn
     const GS = ROOM.GS, rk = Math.sin(st.rock || 0), a = (st.aim == null ? -.4 : st.aim) + rk * .07 + (sOff / 84) * .35, ca = Math.cos(a), sa = Math.sin(a);
-    const NOZ = [GS * (56 * ca + 17 * sa), GS * (56 * sa - 17 * ca)], STAND = 40;
-    const sway = rk * 12, handW = talking ? null : [pt.x - NOZ[0] - ca * STAND - sa * sway, pt.y - NOZ[1] - sa * STAND + ca * sway];
+    // the arm: a slow pull down the section, then the dryer lifts away from the hair and eases back in at the root,
+    // with a soft little wrist circle so it never looks robotic
+    const lift = sp0 >= .78 ? Math.sin((sp0 - .78) / .22 * Math.PI) : 0, wc = st.strokeAmt * (st.phase === 'play' ? 1 : 0);
+    const NOZ = [GS * (56 * ca + 17 * sa), GS * (56 * sa - 17 * ca)], STAND = 40 + lift * 30 * wc + Math.sin(TT * 2.3) * 3 * wc;
+    const sway = rk * 12 + Math.cos(TT * 2.3) * 4 * wc, handW = talking ? null : [pt.x - NOZ[0] - ca * STAND - sa * sway, pt.y - NOZ[1] - sa * STAND + ca * sway];
     const rig = gabRig(st, handW || [0, 0], dt, !talking && st.phase !== 'done', true);
     // the mirror shows exactly what she's doing: the reflected nozzle sits on the same spot of the reflected hair,
     // with the dryer at the same angle, rocking in time (just at the edge of her hair, so it isn't hidden behind her head)
@@ -3047,18 +3058,11 @@ SCENES.dry = {
       const hx = mx - RS * (56 * ca + 17 * sa) - ca * STAND * ms - sa * sway * ms, hy = my - RS * (56 * sa - 17 * ca) - sa * STAND * ms + ca * sway * ms;
       rig.refReach = [-(hx - ROOM.RGX) / ROOM.RGS, (hy - ROOM.RGY) / ROOM.RGS];
     }
-    // her other hand works a round brush through the section she's drying, rolling slowly in time with the dryer
-    if (!talking && st.phase !== 'done') {
-      const bw = [clamp(pt.x - 70 - rk * 6, ROOM.HX - 120, ROOM.HX - 10), clamp(pt.y + 46 + Math.cos(st.rock || 0) * 6, ROOM.HY - 10, ROOM.HY + 110)];
-      st.bh = st.bh ? [lerp(st.bh[0], bw[0], 1 - Math.exp(-2 * dt)), lerp(st.bh[1], bw[1], 1 - Math.exp(-2 * dt))] : bw;
-      rig.reachL = [(st.bh[0] - ROOM.GX) / ROOM.GS, (st.bh[1] - ROOM.GY) / ROOM.GS];
-      
-    }
     const hand = st.rh || handW || [pt.x, pt.y];
     const samExpr = st.phase === 'done' ? 'love' : st.poof > .5 ? 'eek' : talking ? 'grump' : 'smile';
     drawSalon({
       hs: st.hs, samExpr,
-      gab: talking ? { pose: 'phone', tool: 'phone', toolL: 'dryer', expr: 'laugh' } : { pose: 'cut', reach: rig.reach, reachL: rig.reachL, lean: rig.lean + (sOff / 84) * .03, expr: 'smile', tool: st.phase === 'done' ? null : 'dryer', toolL: st.phase === 'done' ? null : 'brush', grip: true, toolAng: a },
+      gab: talking ? { pose: 'phone', tool: 'phone', toolL: 'dryer', expr: 'laugh' } : { pose: 'cut', reach: rig.reach, reachL: rig.reachL, lean: rig.lean + (sOff / 84) * .03, expr: 'smile', tool: st.phase === 'done' ? null : 'dryer', toolL: null, grip: true, toolAng: a },
       refGab: talking ? { pose: 'phone', tool: 'phone', toolL: 'dryer', expr: 'laugh' } : { pose: 'cut', reach: rig.refReach, reachL: rig.refReachL, tool: 'dryer', grip: true, toolAng: Math.PI - a, expr: 'focus' },
       extra: g => {
         if (st.phase === 'done') return;
@@ -3172,7 +3176,11 @@ SCENES.dry = {
   },
   drawHeat() {
     const st = this.st, best = this.bestHeat(), NAMES = ['Cool', 'Warm', 'Hot'], COLS = ['#5a9fd6', '#e0a23a', '#e0563a'];
-    const R = PORT ? 46 : 30, gap = PORT ? 44 : 22, rowW = 6 * R + 2 * gap, cx0 = PORT ? W / 2 - rowW / 2 + R : W - SAFE.r - 24 - rowW + R, cy = H - SAFE.b - (PORT ? 30 : 22) - R - (PORT ? 26 : 18);
+    const R = PORT ? 44 : 28, gap = PORT ? 46 : 26, rowW = 6 * R + 2 * gap, cx0 = PORT ? W / 2 - rowW / 2 + R : W - SAFE.r - 24 - rowW + R, cy = H - SAFE.b - (PORT ? 56 : 40) - R - (PORT ? 26 : 18);
+    const FOR = ['nearly dry', 'damp hair', 'soaking wet'];
+    // a heading that says what the buttons are for, and which one her hair wants right now
+    { const hy = cy - R - (PORT ? 68 : 52), msg = 'Match the heat to her hair: ' + ['Cool', 'Warm', 'Hot'][best] + '!', fs = PORT ? 18 : 14, hw = textW(msg, fs, 600) + 30, hx = cx0 + rowW / 2 - R;
+      rr(ctx, hx - hw / 2, hy - (PORT ? 16 : 12), hw, PORT ? 32 : 24, 16); fillP(ctx, 'rgba(28,21,23,.82)'); text(ctx, msg, hx, hy + 1, { size: fs, weight: 600, color: '#fff' }); }
     st.heatPop = (st.heatPop || 0) + 1 / 60;
     this.heatPts = [];
     for (let i = 0; i < 3; i++) {
@@ -3194,9 +3202,10 @@ SCENES.dry = {
         const lw = textW(NAMES[i], PORT ? 17 : 13, 600) + 22, ly = cy + R + (PORT ? 18 : 13);
         rr(ctx, x - lw / 2, ly - (PORT ? 13 : 10), lw, PORT ? 26 : 20, 13); fillP(ctx, on ? shade(COLS[i], -.3) : 'rgba(28,21,23,.78)');
         text(ctx, NAMES[i], x, ly + 1, { size: PORT ? 17 : 13, weight: 600, color: '#fff' });
+        text(ctx, 'for ' + FOR[i], x, ly + (PORT ? 27 : 21), { size: PORT ? 15 : 11, weight: 600, color: rec ? '#fff2b8' : '#fff', stroke: 'rgba(0,0,0,.55)', sw: 4 });
       }, () => this.setHeat(i));
     }
-    if (st.heat === 2 && st.hot > .3) { ctx.globalAlpha = Math.min(1, st.hot); pill('Too hot!', this.heatPts[2][0], cy - R - 26, { size: 15, bg: 'rgba(192,68,60,.95)' }); ctx.globalAlpha = 1; }
+    if (st.heat === 2 && st.hot > .3) { ctx.globalAlpha = Math.min(1, st.hot); pill('Too hot!', this.heatPts[2][0], cy - R - (PORT ? 104 : 80), { size: 15, bg: 'rgba(192,68,60,.95)' }); ctx.globalAlpha = 1; }
   },
   // the iPhone slides in under the goal cards, top-right, so Samantha's hair stays in view
   drawCall() {
@@ -3209,7 +3218,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v133';
+const GAME_VERSION = 'v134';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -3751,8 +3760,7 @@ function xmasBtn(id, x, y, w, h, label, cb, theme) {
       inner(4, r - 3); ctx.clip(); ctx.fillStyle = '#b8282f'; ctx.fillRect(x, y, w, h);
       ctx.strokeStyle = 'rgba(255,255,255,.09)'; ctx.lineWidth = 1.6; for (let yy = y + 6; yy < y + h; yy += 7) for (let xx = x + 4; xx < x + w; xx += 8) { ctx.beginPath(); ctx.moveTo(xx, yy); ctx.lineTo(xx + 4, yy + 4); ctx.lineTo(xx + 8, yy); ctx.stroke(); }
       ctx.restore(); ctx.save();
-      const hx = x + 14, hy = y + 10; for (const [ang, d] of [[-.6, 1], [.5, 1]]) { ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang); ctx.beginPath(); ctx.moveTo(0, 0); for (let k = 0; k <= 4; k++) ctx.lineTo(6 + k * 5, k % 2 ? -5 : -1); for (let k = 4; k >= 0; k--) ctx.lineTo(6 + k * 5, k % 2 ? 5 : 1); ctx.closePath(); ink(ctx, '#2f9a5e', 1.3); ctx.restore(); }
-      for (let k = 0; k < 3; k++) { circ(ctx, hx + (k - 1) * 5, hy + 3 + (k % 2) * 4, 4); ink(ctx, '#e0283c', 1.2); }
+      // (no holly sprig: a clean knitted panel)
     }
     ctx.restore();
     // glossy top highlight + label
@@ -3854,166 +3862,17 @@ function scriptNeonSign(cx, w, t) {
     // scissors at the end of "Hair By" that flash at random
     if (li === (three ? 1 : 0)) {
       if (TT > (RSIGN.scisNext || 0)) { RSIGN.scisNext = TT + rand(.1, 1); RSIGN.scisOn = [Math.random() < .75]; }
-      const on = t > 1.6 && (RSIGN.scisOn || [true])[0], sx = x + s * .28, sy = y - s * .32, k = s / 120;
-      neonTube(t > 1.6 ? (on ? 1 : .08) : 0, '#00e5ff', Math.max(2, s * .035), () => { ctx.beginPath(); ctx.moveTo(sx - 14 * k, sy - 10 * k); ctx.lineTo(sx + 16 * k, sy + 6 * k); ctx.moveTo(sx - 14 * k, sy + 10 * k); ctx.lineTo(sx + 16 * k, sy - 6 * k); ctx.moveTo(sx - 14 * k + 5 * k, sy - 10 * k); ctx.arc(sx - 14 * k, sy - 10 * k, 5 * k, 0, TAU); ctx.moveTo(sx - 14 * k + 5 * k, sy + 10 * k); ctx.arc(sx - 14 * k, sy + 10 * k, 5 * k, 0, TAU); });
+      // bigger, set apart from "By", and turned to face back toward the lettering
+      const on = t > 1.6 && (RSIGN.scisOn || [true])[0], sx = x + s * .78, sy = y - s * .34, k = s / 62;
+      ctx.save(); ctx.translate(sx, sy); ctx.rotate(Math.PI);
+      neonTube(t > 1.6 ? (on ? 1 : .08) : 0, '#00e5ff', Math.max(2.4, s * .04), () => { ctx.beginPath(); ctx.moveTo(-14 * k, -10 * k); ctx.lineTo(16 * k, 6 * k); ctx.moveTo(-14 * k, 10 * k); ctx.lineTo(16 * k, -6 * k); ctx.moveTo(-9 * k, -10 * k); ctx.arc(-14 * k, -10 * k, 5 * k, 0, TAU); ctx.moveTo(-9 * k, 10 * k); ctx.arc(-14 * k, 10 * k, 5 * k, 0, TAU); });
+      ctx.restore();
     }
   });
   // a gold swash underline
   const ul = tubeLit('under', .4 + total * .13, t), uy = y2 + s2 * .2;
   ctx.restore();
   return uy + 14;
-}
-
-/* ===== Title backdrop: Hair By Gabie G's real building (Spanish-style tower + salmon stucco wing) at Christmas twilight ===== */
-const EXTG = { sx: 0, sw: 0, lampTop: 0 };
-const EXT = { sky: ['#14214a', '#3b3f7a', '#c9708a', '#f4b38c'], stucco: '#d98b6f', stuccoD: '#c27559', cream: '#efe6d2', creamD: '#d9ccb2', tile: '#9a4a32', tileD: '#7a3624', trim: '#efe9dc', glass: '#1c2228', hedge: '#2f5a32', hedgeD: '#234628', palm: '#3f7a3a', palmL: '#6aa14f' };
-function tileRoof(g, x0, x1, y, depth, overhang) {
-  // eave band with rafter tails, then sloped clay tiles
-  g.beginPath(); g.moveTo(x0 - overhang, y); g.lineTo(x0 + depth * .6, y - depth); g.lineTo(x1 - depth * .6, y - depth); g.lineTo(x1 + overhang, y); g.closePath();
-  const tg = g.createLinearGradient(0, y - depth, 0, y); tg.addColorStop(0, EXT.tileD); tg.addColorStop(1, EXT.tile); g.fillStyle = tg; g.fill(); g.strokeStyle = 'rgba(40,14,10,.6)'; g.lineWidth = 1.5; g.stroke();
-  g.save(); g.clip(); g.strokeStyle = 'rgba(60,20,12,.35)'; g.lineWidth = 1.2; for (let x = x0 - overhang; x < x1 + overhang; x += 7) { g.beginPath(); g.moveTo(x, y - depth); g.lineTo(x, y); g.stroke(); } g.restore();
-  g.fillStyle = EXT.trim; g.fillRect(x0 - overhang, y, x1 - x0 + overhang * 2, 5);
-  g.fillStyle = '#5a3a2a'; for (let x = x0 - overhang + 6; x < x1 + overhang - 4; x += 16) g.fillRect(x, y + 5, 5, 7);
-  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x0 - overhang, y + 5, x1 - x0 + overhang * 2, 12);
-}
-function eaveLights(g, x0, x1, y, seed) {
-  const n = Math.max(4, Math.round((x1 - x0) / 18));
-  g.strokeStyle = 'rgba(30,30,30,.6)'; g.lineWidth = 1; g.beginPath();
-  for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n, yy = y + Math.abs(Math.sin(i * .5)) * 5; i ? g.lineTo(x, yy) : g.moveTo(x, yy); } g.stroke();
-  for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n, yy = y + 3 + Math.abs(Math.sin(i * .5)) * 5, col = ['#ff5a4e', '#ffd34d', '#59d17f', '#5aa7ff', '#ff8ad0'][(i + seed) % 5], on = Math.sin(TT * 2.6 + i * 1.7 + seed) > -.35; if (on) { g.globalAlpha = .45; circ(g, x, yy, 6); fillP(g, col); g.globalAlpha = 1; } ell(g, x, yy, 2.4, 3.4); fillP(g, on ? col : shade(col, -.5)); }
-}
-function drawPalm(g, x, ground, hgt, lean, seed) {
-  const topX = x + lean, topY = ground - hgt, sway = Math.sin(TT * .8 + seed) * 3;
-  // trunk with ring texture and wrapped Christmas lights
-  g.beginPath(); g.moveTo(x - 9, ground); g.quadraticCurveTo(x + lean * .2 - 7, ground - hgt * .5, topX - 5, topY); g.lineTo(topX + 5, topY); g.quadraticCurveTo(x + lean * .2 + 7, ground - hgt * .5, x + 9, ground); g.closePath();
-  const tg = g.createLinearGradient(x - 10, 0, x + 10, 0); tg.addColorStop(0, '#6e5a46'); tg.addColorStop(.5, '#9a8268'); tg.addColorStop(1, '#5e4a38'); g.fillStyle = tg; g.fill();
-  for (let i = 1; i < 28; i++) { const k = i / 28, px = lerp(x, topX, k) + lean * .2 * Math.sin(k * Math.PI) * .6, py = lerp(ground, topY, k); line(g, px - 7 + k * 2, py, px + 7 - k * 2, py - 2, 'rgba(50,36,26,.45)', 1.2); }
-  for (let i = 0; i < 22; i++) { const k = i / 22, px = lerp(x, topX, k) + lean * .2 * Math.sin(k * Math.PI) * .6 + Math.sin(k * 40 + seed) * 7, py = lerp(ground - 10, topY + 20, k), col = ['#ff5a4e', '#ffd34d', '#59d17f', '#5aa7ff'][i % 4], on = Math.sin(TT * 3 + i + seed) > -.2; if (on) { g.globalAlpha = .45; circ(g, px, py, 5); fillP(g, col); g.globalAlpha = 1; } circ(g, px, py, 2); fillP(g, on ? col : shade(col, -.5)); }
-  // dead fronds hanging under the crown
-  for (let i = 0; i < 6; i++) { const a = Math.PI * .5 + (i - 2.5) * .22; g.beginPath(); g.moveTo(topX, topY + 4); g.quadraticCurveTo(topX + Math.cos(a) * 30, topY + 30, topX + Math.cos(a) * 26, topY + 46 + i % 2 * 6); strokeP(g, '#9a7a4a', 4); }
-  // green fronds
-  const fronds = 13;
-  for (let i = 0; i < fronds; i++) {
-    const a = -Math.PI * 1.05 + i / (fronds - 1) * Math.PI * 1.1 + Math.sin(TT * 1.1 + i + seed) * .03, len = hgt * (.36 + (i % 3) * .05);
-    const ex = topX + Math.cos(a) * len + sway, ey = topY + Math.sin(a) * len * .55 + len * .32, cx2 = topX + Math.cos(a) * len * .5, cy2 = topY + Math.sin(a) * len * .5 - 10;
-    g.beginPath(); g.moveTo(topX, topY); g.quadraticCurveTo(cx2, cy2, ex, ey); strokeP(g, '#5a7a3a', 2.4);
-    const dir = Math.atan2(ey - topY, ex - topX); for (let j = 1; j < 16; j++) { const k = j / 16, qx = (1 - k) * (1 - k) * topX + 2 * (1 - k) * k * cx2 + k * k * ex, qy = (1 - k) * (1 - k) * topY + 2 * (1 - k) * k * cy2 + k * k * ey, ll = 22 * (1 - k * .55); for (const sd of [-1, 1]) { const la = dir + sd * 1.1 + .35; g.beginPath(); g.moveTo(qx, qy); g.quadraticCurveTo(qx + Math.cos(la) * ll * .6, qy + Math.sin(la) * ll * .6, qx + Math.cos(la) * ll, qy + Math.sin(la) * ll + ll * .35); strokeP(g, j % 2 ? EXT.palm : EXT.palmL, 2.6); } }
-  }
-}
-function drawFountain(g, x, ground, s) {
-  g.save(); g.translate(x, ground); g.scale(s, s);
-  ell(g, 0, -6, 62, 13); ink(g, '#f2efe8', 2); ell(g, 0, -9, 52, 8); fillP(g, '#9fc4d6');
-  rr(g, -8, -60, 16, 54, 4); ink(g, '#f2efe8', 1.6);
-  ell(g, 0, -60, 38, 8); ink(g, '#f2efe8', 1.6); rr(g, -6, -96, 12, 36, 3); ink(g, '#f2efe8', 1.4);
-  ell(g, 0, -96, 22, 5); ink(g, '#f2efe8', 1.4); rr(g, -4, -118, 8, 22, 3); ink(g, '#f2efe8', 1.2); circ(g, 0, -121, 6); ink(g, '#f2efe8', 1.2);
-  g.globalAlpha = .7; for (const [yy, rx] of [[-96, 22], [-60, 38]]) for (let i = 0; i < 6; i++) { const px = -rx + i * rx * 2 / 5, d = (TT * 40 + i * 9) % 30; ell(g, px, yy + 4 + d, 1.4, 3); fillP(g, '#bfe3f2'); } g.globalAlpha = 1;
-  g.restore();
-}
-function drawGabieExterior(t) {
-  const g = ctx, ground = H - SAFE.b - (PORT ? 64 : 46), k = PORT ? Math.min(W / 600 * 1.3, (ground - 560) / 470) : Math.min(H / 640, W / 1100);
-  // twilight sky with a few stars
-  const sky = g.createLinearGradient(0, 0, 0, ground); sky.addColorStop(0, EXT.sky[0]); sky.addColorStop(.45, EXT.sky[1]); sky.addColorStop(.8, EXT.sky[2]); sky.addColorStop(1, EXT.sky[3]); g.fillStyle = sky; g.fillRect(0, 0, W, ground);
-  const r0 = mulberry(7); for (let i = 0; i < 40; i++) { const x = r0() * W, y = r0() * ground * .45; g.globalAlpha = .4 + .5 * Math.abs(Math.sin(TT * (1 + r0()) + i)); drawStar(g, x, y, 1.4 + r0() * 1.6, '#fff6d8', 4); } g.globalAlpha = 1;
-  // distant low red-roofed buildings and trees on the horizon
-  const hz = ground - 150 * k;
-  g.fillStyle = '#4a3a5a'; for (let i = 0; i < 9; i++) { const x = i * W / 8 - 40, w2 = 120 + (i % 3) * 30; g.fillRect(x, hz + 30 * k, w2, 120 * k); g.fillStyle = '#6a3a3a'; g.fillRect(x - 6, hz + 24 * k, w2 + 12, 10 * k); g.fillStyle = '#4a3a5a'; }
-  g.fillStyle = '#2a3a3a'; for (let i = 0; i < 14; i++) { const x = (i * 97) % W, rr2 = (22 + (i % 4) * 8) * k; circ(g, x, hz + 30 * k, rr2); g.fill(); }
-  for (const x of [W * .08, W * .12]) { g.beginPath(); g.moveTo(x, hz - 70 * k); g.quadraticCurveTo(x + 10 * k, hz, x, hz + 40 * k); g.quadraticCurveTo(x - 10 * k, hz, x, hz - 70 * k); g.fillStyle = '#25362e'; g.fill(); }
-  // building geometry
-  const tw = 180 * k, tx = PORT ? W * .17 : W * .24, tTop = ground - 470 * k, wingX = tx + tw * .5, wingTop = ground - 340 * k, sideW = 60 * k;
-  // salmon wing (to the right of the tower, running off-screen)
-  g.fillStyle = EXT.stucco; g.fillRect(wingX, wingTop, W - wingX + 20, ground - wingTop);
-  const sg = g.createLinearGradient(0, wingTop, 0, ground); sg.addColorStop(0, 'rgba(255,200,170,.18)'); sg.addColorStop(1, 'rgba(60,20,30,.25)'); g.fillStyle = sg; g.fillRect(wingX, wingTop, W - wingX + 20, ground - wingTop);
-  g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(wingX, ground - 172 * k, W, 4 * k); // belt course
-  tileRoof(g, wingX, W + 40, wingTop, 22 * k, 14 * k);
-  eaveLights(g, wingX, W, wingTop + 16 * k, 1);
-  // upstairs windows
-  for (let x = wingX + 120 * k; x < W - 40 * k; x += 170 * k) { const wy = wingTop + 34 * k, wh2 = 62 * k; rr(g, x, wy, 66 * k, wh2, 2); ink(g, '#b9654d', 1.6); rr(g, x + 7 * k, wy + 6 * k, 52 * k, wh2 - 12 * k, 1); fillP(g, '#2a3b52'); line(g, x + 33 * k, wy + 6 * k, x + 33 * k, wy + wh2 - 6 * k, '#d9cfc2', 2); g.fillStyle = EXT.trim; g.fillRect(x - 4 * k, wy + wh2, 74 * k, 6 * k); g.globalAlpha = .5; g.fillStyle = '#ffd38a'; g.fillRect(x + 8 * k, wy + 26 * k, 24 * k, wh2 - 32 * k); g.globalAlpha = 1; }
-  // ground-floor storefront: white columns framing dark glass, lamps + lettering above
-  const sx = wingX + (PORT ? 120 : 260) * k, sw = PORT ? W - sx - 14 : Math.min(W - sx - 30 * k, 360 * k), sTop = ground - 150 * k;
-  // the salon inside, seen through the glass
-  g.save(); g.beginPath(); g.rect(sx, sTop, sw, ground - sTop); g.clip();
-  const ih = ground - sTop, wallB = sTop + ih * .68;
-  const iw = g.createLinearGradient(0, sTop, 0, wallB); iw.addColorStop(0, '#d9c7b4'); iw.addColorStop(1, '#c9b6a2'); g.fillStyle = iw; g.fillRect(sx, sTop, sw, wallB - sTop);
-  g.fillStyle = '#a99a8c'; g.fillRect(sx, wallB, sw, ground - wallB); g.fillStyle = 'rgba(0,0,0,.1)'; for (let i = 0; i < 6; i++) g.fillRect(sx, wallB + i * 9 * k, sw, 1.2);
-  // pendant lamps glowing
-  for (const f of [.3, .7]) { const lx = sx + sw * f; line(g, lx, sTop, lx, sTop + 22 * k, '#3a2a30', 1.2); g.beginPath(); g.moveTo(lx - 9 * k, sTop + 30 * k); g.lineTo(lx + 9 * k, sTop + 30 * k); g.lineTo(lx + 4 * k, sTop + 22 * k); g.lineTo(lx - 4 * k, sTop + 22 * k); g.closePath(); fillP(g, '#2f2a33'); const lg = g.createRadialGradient(lx, sTop + 34 * k, 2, lx, sTop + 34 * k, 60 * k); lg.addColorStop(0, 'rgba(255,236,190,.8)'); lg.addColorStop(1, 'rgba(255,236,190,0)'); g.fillStyle = lg; g.fillRect(lx - 60 * k, sTop, 120 * k, 100 * k); }
-  // two gold mirrors with salon chairs in front
-  const stations = sw > 200 * k ? [.28, .58] : [.4];
-  for (const f of stations) {
-    const mx = sx + sw * f, mw = 40 * k, mh = 72 * k, my = wallB - mh - 2;
-    g.beginPath(); g.moveTo(mx - mw / 2, my + mh); g.lineTo(mx - mw / 2, my + mw * .5); g.quadraticCurveTo(mx - mw / 2, my, mx, my); g.quadraticCurveTo(mx + mw / 2, my, mx + mw / 2, my + mw * .5); g.lineTo(mx + mw / 2, my + mh); g.closePath(); fillP(g, '#e3be62');
-    g.beginPath(); g.moveTo(mx - mw / 2 + 4 * k, my + mh); g.lineTo(mx - mw / 2 + 4 * k, my + mw * .5); g.quadraticCurveTo(mx - mw / 2 + 4 * k, my + 4 * k, mx, my + 4 * k); g.quadraticCurveTo(mx + mw / 2 - 4 * k, my + 4 * k, mx + mw / 2 - 4 * k, my + mw * .5); g.lineTo(mx + mw / 2 - 4 * k, my + mh); g.closePath(); fillP(g, '#b9c8d0');
-    g.globalAlpha = .35; line(g, mx - 8 * k, my + 14 * k, mx - 14 * k, my + 40 * k, '#fff', 3); g.globalAlpha = 1;
-    // chair seen from behind
-    const cy = ground - 8 * k; rr(g, mx - 14 * k, cy - 44 * k, 28 * k, 26 * k, 7 * k); fillP(g, '#3d383f'); rr(g, mx - 18 * k, cy - 22 * k, 36 * k, 9 * k, 4 * k); fillP(g, '#3d383f'); line(g, mx, cy - 13 * k, mx, cy, '#c8ccd2', 3); ell(g, mx, cy, 13 * k, 3 * k); fillP(g, '#c8ccd2');
-  }
-  // Gabie walking back and forth between the stations (small, seen through the glass)
-  // Gabie as a soft shadow behind the glass, wandering from spot to spot
-  { const gs = Math.min(.2, ih / 600), left = sx + 30 * k, right = sx + sw * (stations.length > 1 ? .86 : .78) - 40 * k;
-    const W8 = EXTG.walker || (EXTG.walker = { x: left, tx: left, wait: 1, dir: 1, pose: 'stand' });
-    const dt = 1 / 60;
-    if (W8.wait > 0) { W8.wait -= dt; W8.pose = W8.busy ? 'scissorsUp' : 'stand'; if (W8.wait <= 0) { W8.tx = lerp(left, right, Math.random()); W8.busy = false; } }
-    else { const d = W8.tx - W8.x, step = 46 * k * dt; if (Math.abs(d) <= step) { W8.x = W8.tx; W8.wait = rand(.8, 2); W8.busy = Math.random() < .6; } else { W8.x += Math.sign(d) * step; W8.dir = Math.sign(d); W8.pose = 'walk'; } }
-    W8.x = clamp(W8.x, left, right);
-    const cw3 = 140 * gs * 3, ch3 = 380 * gs * 1.1, oc = EXTG.shadowCv || (EXTG.shadowCv = document.createElement('canvas'));
-    oc.width = Math.ceil(cw3 * K); oc.height = Math.ceil(ch3 * K); const og = oc.getContext('2d');
-    og.setTransform(K, 0, 0, K, 0, 0); og.clearRect(0, 0, cw3, ch3);
-    drawGabby(og, cw3 / 2, ch3 - 2, gs, { view: 'front', flip: W8.dir < 0, pose: W8.pose, tool: 'scissors', expr: 'smile', t: TT * 1.3, noShadow: true });
-    og.globalCompositeOperation = 'source-in'; og.fillStyle = '#2a1c20'; og.fillRect(0, 0, cw3, ch3); og.globalCompositeOperation = 'source-over';
-    g.save(); g.globalAlpha = .55; // no canvas filter: Safari support is patchy
-    g.drawImage(oc, W8.x - cw3 / 2, ground - 30 * k - ch3 + 2, cw3, ch3);
-    g.restore();
-  }
-  // product shelf on the wall
-  const shx = sx + sw * .06, shy = sTop + ih * .28; g.fillStyle = '#efe6da'; g.fillRect(shx, shy, sw * .12, 3 * k);
-  ['#ff9fc6', '#f2d27a', '#9fd1c6', '#c8b6ff'].forEach((c, i) => { rr(g, shx + i * 6 * k, shy - 12 * k, 4.5 * k, 12 * k, 1.5); fillP(g, c); });
-  // Christmas tree with twinkling lights
-  const tx2 = sx + sw * (stations.length > 1 ? .86 : .78), th = ih * .62;
-  for (let j = 0; j < 3; j++) { g.beginPath(); g.moveTo(tx2, ground - th + j * th * .22 - 6 * k); g.lineTo(tx2 - (12 + j * 6) * k, ground - th * .42 + j * th * .18); g.lineTo(tx2 + (12 + j * 6) * k, ground - th * .42 + j * th * .18); g.closePath(); fillP(g, '#2f7d4f'); }
-  drawStar(g, tx2, ground - th - 6 * k, 5 * k, '#ffd34d', 5);
-  for (let i = 0; i < 10; i++) { circ(g, tx2 + Math.sin(i * 2.1) * 11 * k, ground - th + (8 + i * 6) * k, 1.8 * k); fillP(g, Math.sin(TT * 3 + i) > 0 ? ['#ff5a4e', '#ffd34d', '#5aa7ff'][i % 3] : 'rgba(255,255,255,.35)'); }
-  // glass: slight tint, reflection streaks
-  g.fillStyle = 'rgba(30,40,60,.18)'; g.fillRect(sx, sTop, sw, ih);
-  g.globalAlpha = .14; g.fillStyle = '#fff'; for (const [a2, b2] of [[.1, .22], [.55, .62]]) { g.beginPath(); g.moveTo(sx + sw * a2, sTop); g.lineTo(sx + sw * b2, sTop); g.lineTo(sx + sw * b2 - ih * .5, ground); g.lineTo(sx + sw * a2 - ih * .5, ground); g.closePath(); g.fill(); } g.globalAlpha = 1;
-  g.restore();
-  g.strokeStyle = '#121418'; g.lineWidth = 3 * k; for (let i = 1; i < 4; i++) { g.beginPath(); g.moveTo(sx + sw * i / 4, sTop); g.lineTo(sx + sw * i / 4, ground); g.stroke(); } g.beginPath(); g.moveTo(sx, sTop + 46 * k); g.lineTo(sx + sw, sTop + 46 * k); g.stroke();
-  for (const cx3 of [sx, sx + sw]) { rr(g, cx3 - 9 * k, sTop - 6 * k, 18 * k, ground - sTop + 6 * k, 3); ink(g, '#f4f1ea', 1.4); rr(g, cx3 - 12 * k, sTop - 10 * k, 24 * k, 8 * k, 2); fillP(g, '#f4f1ea'); }
-  EXTG.sx = sx; EXTG.sw = sw; EXTG.lampTop = sTop - 88 * k; const lsz = Math.min(21 * k, (sw - 30) / 8.6); text(g, 'HAIR BY GABIE G', sx + sw / 2, sTop - 34 * k, { size: lsz, weight: 600, color: '#fbf6ee', font: 'Georgia, "Times New Roman", serif' });
-  for (let i = 0; i < 4; i++) { const lx = sx + sw * (.08 + i * .27), ly = sTop - 72 * k; g.beginPath(); g.moveTo(lx - 10 * k, ly - 6 * k); g.quadraticCurveTo(lx + 2 * k, ly - 14 * k, lx + 10 * k, ly); strokeP(g, '#2a2a2a', 2.4); g.beginPath(); g.moveTo(lx + 3 * k, ly); g.lineTo(lx + 17 * k, ly); g.lineTo(lx + 13 * k, ly + 7 * k); g.lineTo(lx + 7 * k, ly + 7 * k); g.closePath(); fillP(g, '#2a2a2a'); const lc = g.createLinearGradient(0, ly + 7 * k, 0, ly + 50 * k); lc.addColorStop(0, 'rgba(255,230,170,.5)'); lc.addColorStop(1, 'rgba(255,230,170,0)'); g.fillStyle = lc; g.beginPath(); g.moveTo(lx + 7 * k, ly + 7 * k); g.lineTo(lx + 13 * k, ly + 7 * k); g.lineTo(lx + 30 * k, ly + 50 * k); g.lineTo(lx - 10 * k, ly + 50 * k); g.closePath(); g.fill(); line(g, lx + 6 * k, ly - 2 * k, lx + 14 * k, ly - 2 * k, '#e2443b', 3); }
-  // window between tower and storefront
-  const wx2 = wingX + (PORT ? 30 : 50) * k; if (wx2 + 50 * k < sx - 10 * k) { rr(g, wx2, ground - 140 * k, 50 * k, 72 * k, 2); ink(g, '#b9654d', 1.4); rr(g, wx2 + 5 * k, ground - 135 * k, 40 * k, 62 * k, 1); fillP(g, '#2a3b52'); }
-  // tower: salmon side + cream face, hipped clay roof, arched entry with a wreath
-  g.fillStyle = EXT.stuccoD; g.fillRect(tx - tw / 2 - sideW, tTop + 40 * k, sideW, ground - tTop - 40 * k);
-  const cg = g.createLinearGradient(tx - tw / 2, 0, tx + tw / 2, 0); cg.addColorStop(0, EXT.cream); cg.addColorStop(1, EXT.creamD); g.fillStyle = cg; g.fillRect(tx - tw / 2, tTop, tw, ground - tTop);
-  g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(tx - tw / 2, ground - 210 * k, tw, 6 * k);
-  // hipped roof
-  g.beginPath(); g.moveTo(tx - tw / 2 - sideW - 26 * k, tTop); g.lineTo(tx - 20 * k, tTop - 62 * k); g.lineTo(tx + 20 * k, tTop - 62 * k); g.lineTo(tx + tw / 2 + 26 * k, tTop); g.closePath();
-  const rg = g.createLinearGradient(0, tTop - 62 * k, 0, tTop); rg.addColorStop(0, EXT.tileD); rg.addColorStop(1, EXT.tile); g.fillStyle = rg; g.fill();
-  g.save(); g.clip(); g.strokeStyle = 'rgba(60,20,12,.35)'; for (let x = tx - tw; x < tx + tw; x += 7) { g.beginPath(); g.moveTo(x, tTop - 62 * k); g.lineTo(x + (x - tx) * .15, tTop); g.stroke(); } g.restore();
-  g.fillStyle = EXT.trim; g.fillRect(tx - tw / 2 - sideW - 26 * k, tTop, tw + sideW + 52 * k, 6 * k);
-  g.fillStyle = '#5a3a2a'; for (let x = tx - tw / 2 - sideW - 20 * k; x < tx + tw / 2 + 22 * k; x += 15 * k) g.fillRect(x, tTop + 6 * k, 5 * k, 9 * k);
-  eaveLights(g, tx - tw / 2 - sideW - 20 * k, tx + tw / 2 + 22 * k, tTop + 18 * k, 3);
-  line(g, tx + tw / 2 - 6 * k, tTop + 10 * k, tx + tw / 2 - 6 * k, ground - 4, '#b06a44', 3 * k); // copper downspout
-  // arched entry
-  const ax = tx - 6 * k, aw = 80 * k, aTop = ground - 175 * k;
-  g.beginPath(); g.moveTo(ax - aw / 2 - 10 * k, ground); g.lineTo(ax - aw / 2 - 10 * k, aTop + aw / 2); g.arc(ax, aTop + aw / 2, aw / 2 + 10 * k, Math.PI, 0); g.lineTo(ax + aw / 2 + 10 * k, ground); g.closePath(); fillP(g, '#e3d8c2');
-  g.beginPath(); g.moveTo(ax - aw / 2, ground); g.lineTo(ax - aw / 2, aTop + aw / 2); g.arc(ax, aTop + aw / 2, aw / 2, Math.PI, 0); g.lineTo(ax + aw / 2, ground); g.closePath(); fillP(g, '#3a2620');
-  const dg = g.createRadialGradient(ax, ground - 60 * k, 4, ax, ground - 60 * k, 70 * k); dg.addColorStop(0, 'rgba(255,190,120,.35)'); dg.addColorStop(1, 'rgba(255,190,120,0)'); g.fillStyle = dg; g.fillRect(ax - aw, aTop, aw * 2, ground - aTop);
-  const wr = 16 * k, wx3 = ax, wy3 = aTop + 50 * k; for (let i = 0; i < 14; i++) { const a = i / 14 * TAU; ell(g, wx3 + Math.cos(a) * wr, wy3 + Math.sin(a) * wr, 5 * k, 3.4 * k, a + 1.2); fillP(g, i % 2 ? '#2f8a57' : '#256e47'); } for (const sd of [-1, 1]) { g.beginPath(); g.moveTo(wx3, wy3 + wr); g.quadraticCurveTo(wx3 + sd * 9 * k, wy3 + wr - 8 * k, wx3 + sd * 10 * k, wy3 + wr + 2 * k); fillP(g, '#e2443b'); }
-  // palms (in front of the tower), then the front garden
-  drawPalm(g, PORT ? tx - tw * .18 : tx - tw * .62, ground, 430 * k, (PORT ? 22 : -40) * k, 1);
-  drawPalm(g, PORT ? tx + tw * .42 : tx + tw * .2, ground, 370 * k, (PORT ? 34 : 28) * k, 2);
-  drawFountain(g, PORT ? 54 * k : tx - tw * 1.35, ground, .8 * k);
-  // hedges along the building + terracotta pot
-  for (let x = wingX - 10; x < W + 30; x += 46 * k) { const hh = (34 + Math.sin(x) * 4) * k; rr(g, x, ground - hh, 50 * k, hh + 4, 12 * k); const hg = g.createLinearGradient(0, ground - hh, 0, ground); hg.addColorStop(0, EXT.hedge); hg.addColorStop(1, EXT.hedgeD); g.fillStyle = hg; g.fill(); }
-  for (const bx of [tx - tw * .3, tx + tw * .45]) { circ(g, bx, ground - 18 * k, 24 * k); fillP(g, '#3a6a3a'); }
-  const px2 = tx + tw * .02; g.beginPath(); g.moveTo(px2 - 16 * k, ground - 34 * k); g.lineTo(px2 + 16 * k, ground - 34 * k); g.lineTo(px2 + 11 * k, ground); g.lineTo(px2 - 11 * k, ground); g.closePath(); fillP(g, '#c26a42'); for (let i = 0; i < 5; i++) { circ(g, px2 - 10 * k + i * 5 * k, ground - 40 * k - (i % 2) * 5 * k, 4 * k); fillP(g, '#e2443b'); }
-  // sidewalk + grass strip
-  g.fillStyle = '#b9b4ae'; g.fillRect(0, ground, W, H - ground); g.fillStyle = 'rgba(0,0,0,.12)'; for (let x = 0; x < W; x += 60 * k) g.fillRect(x, ground, 2, H - ground);
-  g.fillStyle = '#4f7a3e'; g.fillRect(0, ground + 26 * k, W, 18 * k);
-  // gentle snow flurry
-  g.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 26; i++) { const s1 = (i * .618) % 1, s2 = (i * .414 + .3) % 1; circ(g, (s1 * W + Math.sin(TT * .8 + i) * 16 + W) % W, (s2 * H + TT * (16 + s2 * 20)) % H, 1 + s1 * 1.4); g.fill(); }
 }
 
 
@@ -4678,6 +4537,158 @@ function drawCardBoxIntro(t) {
   ctx.restore(); ctx.restore();
   ctx.restore();
   ctx.restore();
+}
+
+/* ===== Title backdrop: Hair By Gabie G's real building (Spanish-style tower + salmon stucco wing) at Christmas twilight ===== */
+const EXTG = { sx: 0, sw: 0, lampTop: 0 };
+const EXT = { sky: ['#14214a', '#3b3f7a', '#c9708a', '#f4b38c'], stucco: '#d98b6f', stuccoD: '#c27559', cream: '#efe6d2', creamD: '#d9ccb2', tile: '#9a4a32', tileD: '#7a3624', trim: '#efe9dc', glass: '#1c2228', hedge: '#2f5a32', hedgeD: '#234628', palm: '#3f7a3a', palmL: '#6aa14f' };
+function tileRoof(g, x0, x1, y, depth, overhang) {
+  // eave band with rafter tails, then sloped clay tiles
+  g.beginPath(); g.moveTo(x0 - overhang, y); g.lineTo(x0 + depth * .6, y - depth); g.lineTo(x1 - depth * .6, y - depth); g.lineTo(x1 + overhang, y); g.closePath();
+  const tg = g.createLinearGradient(0, y - depth, 0, y); tg.addColorStop(0, EXT.tileD); tg.addColorStop(1, EXT.tile); g.fillStyle = tg; g.fill(); g.strokeStyle = 'rgba(40,14,10,.6)'; g.lineWidth = 1.5; g.stroke();
+  g.save(); g.clip(); g.strokeStyle = 'rgba(60,20,12,.35)'; g.lineWidth = 1.2; for (let x = x0 - overhang; x < x1 + overhang; x += 7) { g.beginPath(); g.moveTo(x, y - depth); g.lineTo(x, y); g.stroke(); } g.restore();
+  g.fillStyle = EXT.trim; g.fillRect(x0 - overhang, y, x1 - x0 + overhang * 2, 5);
+  g.fillStyle = '#5a3a2a'; for (let x = x0 - overhang + 6; x < x1 + overhang - 4; x += 16) g.fillRect(x, y + 5, 5, 7);
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x0 - overhang, y + 5, x1 - x0 + overhang * 2, 12);
+}
+function eaveLights(g, x0, x1, y, seed) {
+  const n = Math.max(4, Math.round((x1 - x0) / 18));
+  g.strokeStyle = 'rgba(30,30,30,.6)'; g.lineWidth = 1; g.beginPath();
+  for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n, yy = y + Math.abs(Math.sin(i * .5)) * 5; i ? g.lineTo(x, yy) : g.moveTo(x, yy); } g.stroke();
+  for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n, yy = y + 3 + Math.abs(Math.sin(i * .5)) * 5, col = ['#ff5a4e', '#ffd34d', '#59d17f', '#5aa7ff', '#ff8ad0'][(i + seed) % 5], on = Math.sin(TT * 2.6 + i * 1.7 + seed) > -.35; if (on) { g.globalAlpha = .45; circ(g, x, yy, 6); fillP(g, col); g.globalAlpha = 1; } ell(g, x, yy, 2.4, 3.4); fillP(g, on ? col : shade(col, -.5)); }
+}
+function drawPalm(g, x, ground, hgt, lean, seed) {
+  const topX = x + lean, topY = ground - hgt, sway = Math.sin(TT * .8 + seed) * 3;
+  // trunk with ring texture and wrapped Christmas lights
+  g.beginPath(); g.moveTo(x - 9, ground); g.quadraticCurveTo(x + lean * .2 - 7, ground - hgt * .5, topX - 5, topY); g.lineTo(topX + 5, topY); g.quadraticCurveTo(x + lean * .2 + 7, ground - hgt * .5, x + 9, ground); g.closePath();
+  const tg = g.createLinearGradient(x - 10, 0, x + 10, 0); tg.addColorStop(0, '#6e5a46'); tg.addColorStop(.5, '#9a8268'); tg.addColorStop(1, '#5e4a38'); g.fillStyle = tg; g.fill();
+  for (let i = 1; i < 28; i++) { const k = i / 28, px = lerp(x, topX, k) + lean * .2 * Math.sin(k * Math.PI) * .6, py = lerp(ground, topY, k); line(g, px - 7 + k * 2, py, px + 7 - k * 2, py - 2, 'rgba(50,36,26,.45)', 1.2); }
+  for (let i = 0; i < 22; i++) { const k = i / 22, px = lerp(x, topX, k) + lean * .2 * Math.sin(k * Math.PI) * .6 + Math.sin(k * 40 + seed) * 7, py = lerp(ground - 10, topY + 20, k), col = ['#ff5a4e', '#ffd34d', '#59d17f', '#5aa7ff'][i % 4], on = Math.sin(TT * 3 + i + seed) > -.2; if (on) { g.globalAlpha = .45; circ(g, px, py, 5); fillP(g, col); g.globalAlpha = 1; } circ(g, px, py, 2); fillP(g, on ? col : shade(col, -.5)); }
+  // dead fronds hanging under the crown
+  for (let i = 0; i < 6; i++) { const a = Math.PI * .5 + (i - 2.5) * .22; g.beginPath(); g.moveTo(topX, topY + 4); g.quadraticCurveTo(topX + Math.cos(a) * 30, topY + 30, topX + Math.cos(a) * 26, topY + 46 + i % 2 * 6); strokeP(g, '#9a7a4a', 4); }
+  // green fronds
+  const fronds = 13;
+  for (let i = 0; i < fronds; i++) {
+    const a = -Math.PI * 1.05 + i / (fronds - 1) * Math.PI * 1.1 + Math.sin(TT * 1.1 + i + seed) * .03, len = hgt * (.36 + (i % 3) * .05);
+    const ex = topX + Math.cos(a) * len + sway, ey = topY + Math.sin(a) * len * .55 + len * .32, cx2 = topX + Math.cos(a) * len * .5, cy2 = topY + Math.sin(a) * len * .5 - 10;
+    g.beginPath(); g.moveTo(topX, topY); g.quadraticCurveTo(cx2, cy2, ex, ey); strokeP(g, '#5a7a3a', 2.4);
+    const dir = Math.atan2(ey - topY, ex - topX); for (let j = 1; j < 16; j++) { const k = j / 16, qx = (1 - k) * (1 - k) * topX + 2 * (1 - k) * k * cx2 + k * k * ex, qy = (1 - k) * (1 - k) * topY + 2 * (1 - k) * k * cy2 + k * k * ey, ll = 22 * (1 - k * .55); for (const sd of [-1, 1]) { const la = dir + sd * 1.1 + .35; g.beginPath(); g.moveTo(qx, qy); g.quadraticCurveTo(qx + Math.cos(la) * ll * .6, qy + Math.sin(la) * ll * .6, qx + Math.cos(la) * ll, qy + Math.sin(la) * ll + ll * .35); strokeP(g, j % 2 ? EXT.palm : EXT.palmL, 2.6); } }
+  }
+}
+function drawFountain(g, x, ground, s) {
+  g.save(); g.translate(x, ground); g.scale(s, s);
+  ell(g, 0, -6, 62, 13); ink(g, '#f2efe8', 2); ell(g, 0, -9, 52, 8); fillP(g, '#9fc4d6');
+  rr(g, -8, -60, 16, 54, 4); ink(g, '#f2efe8', 1.6);
+  ell(g, 0, -60, 38, 8); ink(g, '#f2efe8', 1.6); rr(g, -6, -96, 12, 36, 3); ink(g, '#f2efe8', 1.4);
+  ell(g, 0, -96, 22, 5); ink(g, '#f2efe8', 1.4); rr(g, -4, -118, 8, 22, 3); ink(g, '#f2efe8', 1.2); circ(g, 0, -121, 6); ink(g, '#f2efe8', 1.2);
+  g.globalAlpha = .7; for (const [yy, rx] of [[-96, 22], [-60, 38]]) for (let i = 0; i < 6; i++) { const px = -rx + i * rx * 2 / 5, d = (TT * 40 + i * 9) % 30; ell(g, px, yy + 4 + d, 1.4, 3); fillP(g, '#bfe3f2'); } g.globalAlpha = 1;
+  g.restore();
+}
+function drawGabieExterior(t) {
+  const g = ctx, ground = H - SAFE.b - (PORT ? 64 : 46), k = PORT ? Math.min(W / 600 * 1.3, (ground - 560) / 470) : Math.min(H / 640, W / 1100);
+  // twilight sky with a few stars
+  const sky = g.createLinearGradient(0, 0, 0, ground); sky.addColorStop(0, EXT.sky[0]); sky.addColorStop(.45, EXT.sky[1]); sky.addColorStop(.8, EXT.sky[2]); sky.addColorStop(1, EXT.sky[3]); g.fillStyle = sky; g.fillRect(0, 0, W, ground);
+  const r0 = mulberry(7); for (let i = 0; i < 40; i++) { const x = r0() * W, y = r0() * ground * .45; g.globalAlpha = .4 + .5 * Math.abs(Math.sin(TT * (1 + r0()) + i)); drawStar(g, x, y, 1.4 + r0() * 1.6, '#fff6d8', 4); } g.globalAlpha = 1;
+  // distant low red-roofed buildings and trees on the horizon
+  const hz = ground - 150 * k;
+  g.fillStyle = '#4a3a5a'; for (let i = 0; i < 9; i++) { const x = i * W / 8 - 40, w2 = 120 + (i % 3) * 30; g.fillRect(x, hz + 30 * k, w2, 120 * k); g.fillStyle = '#6a3a3a'; g.fillRect(x - 6, hz + 24 * k, w2 + 12, 10 * k); g.fillStyle = '#4a3a5a'; }
+  g.fillStyle = '#2a3a3a'; for (let i = 0; i < 14; i++) { const x = (i * 97) % W, rr2 = (22 + (i % 4) * 8) * k; circ(g, x, hz + 30 * k, rr2); g.fill(); }
+  for (const x of [W * .08, W * .12]) { g.beginPath(); g.moveTo(x, hz - 70 * k); g.quadraticCurveTo(x + 10 * k, hz, x, hz + 40 * k); g.quadraticCurveTo(x - 10 * k, hz, x, hz - 70 * k); g.fillStyle = '#25362e'; g.fill(); }
+  // building geometry
+  const tw = 180 * k, tx = PORT ? W * .17 : W * .24, tTop = ground - 470 * k, wingX = tx + tw * .5, wingTop = ground - 340 * k, sideW = 60 * k;
+  // salmon wing (to the right of the tower, running off-screen)
+  g.fillStyle = EXT.stucco; g.fillRect(wingX, wingTop, W - wingX + 20, ground - wingTop);
+  const sg = g.createLinearGradient(0, wingTop, 0, ground); sg.addColorStop(0, 'rgba(255,200,170,.18)'); sg.addColorStop(1, 'rgba(60,20,30,.25)'); g.fillStyle = sg; g.fillRect(wingX, wingTop, W - wingX + 20, ground - wingTop);
+  g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(wingX, ground - 172 * k, W, 4 * k); // belt course
+  tileRoof(g, wingX, W + 40, wingTop, 22 * k, 14 * k);
+  eaveLights(g, wingX, W, wingTop + 16 * k, 1);
+  // upstairs windows
+  for (let x = wingX + 120 * k; x < W - 40 * k; x += 170 * k) { const wy = wingTop + 34 * k, wh2 = 62 * k; rr(g, x, wy, 66 * k, wh2, 2); ink(g, '#b9654d', 1.6); rr(g, x + 7 * k, wy + 6 * k, 52 * k, wh2 - 12 * k, 1); fillP(g, '#2a3b52'); line(g, x + 33 * k, wy + 6 * k, x + 33 * k, wy + wh2 - 6 * k, '#d9cfc2', 2); g.fillStyle = EXT.trim; g.fillRect(x - 4 * k, wy + wh2, 74 * k, 6 * k); g.globalAlpha = .5; g.fillStyle = '#ffd38a'; g.fillRect(x + 8 * k, wy + 26 * k, 24 * k, wh2 - 32 * k); g.globalAlpha = 1; }
+  // ground-floor storefront: white columns framing dark glass, lamps + lettering above
+  const sx = wingX + (PORT ? 120 : 260) * k, sw = PORT ? W - sx - 14 : Math.min(W - sx - 30 * k, 360 * k), sTop = ground - 150 * k;
+  // the salon inside, seen through the glass
+  g.save(); g.beginPath(); g.rect(sx, sTop, sw, ground - sTop); g.clip();
+  const ih = ground - sTop, wallB = sTop + ih * .68;
+  const iw = g.createLinearGradient(0, sTop, 0, wallB); iw.addColorStop(0, '#d9c7b4'); iw.addColorStop(1, '#c9b6a2'); g.fillStyle = iw; g.fillRect(sx, sTop, sw, wallB - sTop);
+  g.fillStyle = '#a99a8c'; g.fillRect(sx, wallB, sw, ground - wallB); g.fillStyle = 'rgba(0,0,0,.1)'; for (let i = 0; i < 6; i++) g.fillRect(sx, wallB + i * 9 * k, sw, 1.2);
+  // pendant lamps glowing
+  for (const f of [.3, .7]) { const lx = sx + sw * f; line(g, lx, sTop, lx, sTop + 22 * k, '#3a2a30', 1.2); g.beginPath(); g.moveTo(lx - 9 * k, sTop + 30 * k); g.lineTo(lx + 9 * k, sTop + 30 * k); g.lineTo(lx + 4 * k, sTop + 22 * k); g.lineTo(lx - 4 * k, sTop + 22 * k); g.closePath(); fillP(g, '#2f2a33'); const lg = g.createRadialGradient(lx, sTop + 34 * k, 2, lx, sTop + 34 * k, 60 * k); lg.addColorStop(0, 'rgba(255,236,190,.8)'); lg.addColorStop(1, 'rgba(255,236,190,0)'); g.fillStyle = lg; g.fillRect(lx - 60 * k, sTop, 120 * k, 100 * k); }
+  // two gold mirrors with salon chairs in front
+  const stations = sw > 200 * k ? [.28, .58] : [.4];
+  for (const f of stations) {
+    const mx = sx + sw * f, mw = 40 * k, mh = 72 * k, my = wallB - mh - 2;
+    g.beginPath(); g.moveTo(mx - mw / 2, my + mh); g.lineTo(mx - mw / 2, my + mw * .5); g.quadraticCurveTo(mx - mw / 2, my, mx, my); g.quadraticCurveTo(mx + mw / 2, my, mx + mw / 2, my + mw * .5); g.lineTo(mx + mw / 2, my + mh); g.closePath(); fillP(g, '#e3be62');
+    g.beginPath(); g.moveTo(mx - mw / 2 + 4 * k, my + mh); g.lineTo(mx - mw / 2 + 4 * k, my + mw * .5); g.quadraticCurveTo(mx - mw / 2 + 4 * k, my + 4 * k, mx, my + 4 * k); g.quadraticCurveTo(mx + mw / 2 - 4 * k, my + 4 * k, mx + mw / 2 - 4 * k, my + mw * .5); g.lineTo(mx + mw / 2 - 4 * k, my + mh); g.closePath(); fillP(g, '#b9c8d0');
+    g.globalAlpha = .35; line(g, mx - 8 * k, my + 14 * k, mx - 14 * k, my + 40 * k, '#fff', 3); g.globalAlpha = 1;
+    // chair seen from behind
+    const cy = ground - 8 * k; rr(g, mx - 14 * k, cy - 44 * k, 28 * k, 26 * k, 7 * k); fillP(g, '#3d383f'); rr(g, mx - 18 * k, cy - 22 * k, 36 * k, 9 * k, 4 * k); fillP(g, '#3d383f'); line(g, mx, cy - 13 * k, mx, cy, '#c8ccd2', 3); ell(g, mx, cy, 13 * k, 3 * k); fillP(g, '#c8ccd2');
+  }
+  // Gabie walking back and forth between the stations (small, seen through the glass)
+  // Gabie as a soft shadow behind the glass, wandering from spot to spot
+  { const gs = Math.min(.2, ih / 600), left = sx + 30 * k, right = sx + sw * (stations.length > 1 ? .86 : .78) - 40 * k;
+    const W8 = EXTG.walker || (EXTG.walker = { x: left, tx: left, wait: 1, dir: 1, pose: 'stand' });
+    const dt = 1 / 60;
+    if (W8.wait > 0) { W8.wait -= dt; W8.pose = W8.busy ? 'scissorsUp' : 'stand'; if (W8.wait <= 0) { W8.tx = lerp(left, right, Math.random()); W8.busy = false; } }
+    else { const d = W8.tx - W8.x, step = 46 * k * dt; if (Math.abs(d) <= step) { W8.x = W8.tx; W8.wait = rand(.8, 2); W8.busy = Math.random() < .6; } else { W8.x += Math.sign(d) * step; W8.dir = Math.sign(d); W8.pose = 'walk'; } }
+    W8.x = clamp(W8.x, left, right);
+    const cw3 = 140 * gs * 3, ch3 = 380 * gs * 1.1, oc = EXTG.shadowCv || (EXTG.shadowCv = document.createElement('canvas'));
+    oc.width = Math.ceil(cw3 * K); oc.height = Math.ceil(ch3 * K); const og = oc.getContext('2d');
+    og.setTransform(K, 0, 0, K, 0, 0); og.clearRect(0, 0, cw3, ch3);
+    drawGabby(og, cw3 / 2, ch3 - 2, gs, { view: 'front', flip: W8.dir < 0, pose: W8.pose, tool: 'scissors', expr: 'smile', t: TT * 1.3, noShadow: true });
+    og.globalCompositeOperation = 'source-in'; og.fillStyle = '#2a1c20'; og.fillRect(0, 0, cw3, ch3); og.globalCompositeOperation = 'source-over';
+    g.save(); g.globalAlpha = .55; // no canvas filter: Safari support is patchy
+    g.drawImage(oc, W8.x - cw3 / 2, ground - 30 * k - ch3 + 2, cw3, ch3);
+    g.restore();
+  }
+  // product shelf on the wall
+  const shx = sx + sw * .06, shy = sTop + ih * .28; g.fillStyle = '#efe6da'; g.fillRect(shx, shy, sw * .12, 3 * k);
+  ['#ff9fc6', '#f2d27a', '#9fd1c6', '#c8b6ff'].forEach((c, i) => { rr(g, shx + i * 6 * k, shy - 12 * k, 4.5 * k, 12 * k, 1.5); fillP(g, c); });
+  // Christmas tree with twinkling lights
+  const tx2 = sx + sw * (stations.length > 1 ? .86 : .78), th = ih * .62;
+  for (let j = 0; j < 3; j++) { g.beginPath(); g.moveTo(tx2, ground - th + j * th * .22 - 6 * k); g.lineTo(tx2 - (12 + j * 6) * k, ground - th * .42 + j * th * .18); g.lineTo(tx2 + (12 + j * 6) * k, ground - th * .42 + j * th * .18); g.closePath(); fillP(g, '#2f7d4f'); }
+  drawStar(g, tx2, ground - th - 6 * k, 5 * k, '#ffd34d', 5);
+  for (let i = 0; i < 10; i++) { circ(g, tx2 + Math.sin(i * 2.1) * 11 * k, ground - th + (8 + i * 6) * k, 1.8 * k); fillP(g, Math.sin(TT * 3 + i) > 0 ? ['#ff5a4e', '#ffd34d', '#5aa7ff'][i % 3] : 'rgba(255,255,255,.35)'); }
+  // glass: slight tint, reflection streaks
+  g.fillStyle = 'rgba(30,40,60,.18)'; g.fillRect(sx, sTop, sw, ih);
+  g.globalAlpha = .14; g.fillStyle = '#fff'; for (const [a2, b2] of [[.1, .22], [.55, .62]]) { g.beginPath(); g.moveTo(sx + sw * a2, sTop); g.lineTo(sx + sw * b2, sTop); g.lineTo(sx + sw * b2 - ih * .5, ground); g.lineTo(sx + sw * a2 - ih * .5, ground); g.closePath(); g.fill(); } g.globalAlpha = 1;
+  g.restore();
+  g.strokeStyle = '#121418'; g.lineWidth = 3 * k; for (let i = 1; i < 4; i++) { g.beginPath(); g.moveTo(sx + sw * i / 4, sTop); g.lineTo(sx + sw * i / 4, ground); g.stroke(); } g.beginPath(); g.moveTo(sx, sTop + 46 * k); g.lineTo(sx + sw, sTop + 46 * k); g.stroke();
+  for (const cx3 of [sx, sx + sw]) { rr(g, cx3 - 9 * k, sTop - 6 * k, 18 * k, ground - sTop + 6 * k, 3); ink(g, '#f4f1ea', 1.4); rr(g, cx3 - 12 * k, sTop - 10 * k, 24 * k, 8 * k, 2); fillP(g, '#f4f1ea'); }
+  EXTG.sx = sx; EXTG.sw = sw; EXTG.lampTop = sTop - 88 * k; const lsz = Math.min(21 * k, (sw - 30) / 8.6); text(g, 'HAIR BY GABIE G', sx + sw / 2, sTop - 34 * k, { size: lsz, weight: 600, color: '#fbf6ee', font: 'Georgia, "Times New Roman", serif' });
+  for (let i = 0; i < 4; i++) { const lx = sx + sw * (.08 + i * .27), ly = sTop - 72 * k; g.beginPath(); g.moveTo(lx - 10 * k, ly - 6 * k); g.quadraticCurveTo(lx + 2 * k, ly - 14 * k, lx + 10 * k, ly); strokeP(g, '#2a2a2a', 2.4); g.beginPath(); g.moveTo(lx + 3 * k, ly); g.lineTo(lx + 17 * k, ly); g.lineTo(lx + 13 * k, ly + 7 * k); g.lineTo(lx + 7 * k, ly + 7 * k); g.closePath(); fillP(g, '#2a2a2a'); const lc = g.createLinearGradient(0, ly + 7 * k, 0, ly + 50 * k); lc.addColorStop(0, 'rgba(255,230,170,.5)'); lc.addColorStop(1, 'rgba(255,230,170,0)'); g.fillStyle = lc; g.beginPath(); g.moveTo(lx + 7 * k, ly + 7 * k); g.lineTo(lx + 13 * k, ly + 7 * k); g.lineTo(lx + 30 * k, ly + 50 * k); g.lineTo(lx - 10 * k, ly + 50 * k); g.closePath(); g.fill(); line(g, lx + 6 * k, ly - 2 * k, lx + 14 * k, ly - 2 * k, '#e2443b', 3); }
+  // window between tower and storefront
+  const wx2 = wingX + (PORT ? 30 : 50) * k; if (wx2 + 50 * k < sx - 10 * k) { rr(g, wx2, ground - 140 * k, 50 * k, 72 * k, 2); ink(g, '#b9654d', 1.4); rr(g, wx2 + 5 * k, ground - 135 * k, 40 * k, 62 * k, 1); fillP(g, '#2a3b52'); }
+  // tower: salmon side + cream face, hipped clay roof, arched entry with a wreath
+  g.fillStyle = EXT.stuccoD; g.fillRect(tx - tw / 2 - sideW, tTop + 40 * k, sideW, ground - tTop - 40 * k);
+  const cg = g.createLinearGradient(tx - tw / 2, 0, tx + tw / 2, 0); cg.addColorStop(0, EXT.cream); cg.addColorStop(1, EXT.creamD); g.fillStyle = cg; g.fillRect(tx - tw / 2, tTop, tw, ground - tTop);
+  g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(tx - tw / 2, ground - 210 * k, tw, 6 * k);
+  // hipped roof
+  g.beginPath(); g.moveTo(tx - tw / 2 - sideW - 26 * k, tTop); g.lineTo(tx - 20 * k, tTop - 62 * k); g.lineTo(tx + 20 * k, tTop - 62 * k); g.lineTo(tx + tw / 2 + 26 * k, tTop); g.closePath();
+  const rg = g.createLinearGradient(0, tTop - 62 * k, 0, tTop); rg.addColorStop(0, EXT.tileD); rg.addColorStop(1, EXT.tile); g.fillStyle = rg; g.fill();
+  g.save(); g.clip(); g.strokeStyle = 'rgba(60,20,12,.35)'; for (let x = tx - tw; x < tx + tw; x += 7) { g.beginPath(); g.moveTo(x, tTop - 62 * k); g.lineTo(x + (x - tx) * .15, tTop); g.stroke(); } g.restore();
+  g.fillStyle = EXT.trim; g.fillRect(tx - tw / 2 - sideW - 26 * k, tTop, tw + sideW + 52 * k, 6 * k);
+  g.fillStyle = '#5a3a2a'; for (let x = tx - tw / 2 - sideW - 20 * k; x < tx + tw / 2 + 22 * k; x += 15 * k) g.fillRect(x, tTop + 6 * k, 5 * k, 9 * k);
+  eaveLights(g, tx - tw / 2 - sideW - 20 * k, tx + tw / 2 + 22 * k, tTop + 18 * k, 3);
+  line(g, tx + tw / 2 - 6 * k, tTop + 10 * k, tx + tw / 2 - 6 * k, ground - 4, '#b06a44', 3 * k); // copper downspout
+  // arched entry
+  const ax = tx - 6 * k, aw = 80 * k, aTop = ground - 175 * k;
+  g.beginPath(); g.moveTo(ax - aw / 2 - 10 * k, ground); g.lineTo(ax - aw / 2 - 10 * k, aTop + aw / 2); g.arc(ax, aTop + aw / 2, aw / 2 + 10 * k, Math.PI, 0); g.lineTo(ax + aw / 2 + 10 * k, ground); g.closePath(); fillP(g, '#e3d8c2');
+  g.beginPath(); g.moveTo(ax - aw / 2, ground); g.lineTo(ax - aw / 2, aTop + aw / 2); g.arc(ax, aTop + aw / 2, aw / 2, Math.PI, 0); g.lineTo(ax + aw / 2, ground); g.closePath(); fillP(g, '#3a2620');
+  const dg = g.createRadialGradient(ax, ground - 60 * k, 4, ax, ground - 60 * k, 70 * k); dg.addColorStop(0, 'rgba(255,190,120,.35)'); dg.addColorStop(1, 'rgba(255,190,120,0)'); g.fillStyle = dg; g.fillRect(ax - aw, aTop, aw * 2, ground - aTop);
+  const wr = 16 * k, wx3 = ax, wy3 = aTop + 50 * k; for (let i = 0; i < 14; i++) { const a = i / 14 * TAU; ell(g, wx3 + Math.cos(a) * wr, wy3 + Math.sin(a) * wr, 5 * k, 3.4 * k, a + 1.2); fillP(g, i % 2 ? '#2f8a57' : '#256e47'); } for (const sd of [-1, 1]) { g.beginPath(); g.moveTo(wx3, wy3 + wr); g.quadraticCurveTo(wx3 + sd * 9 * k, wy3 + wr - 8 * k, wx3 + sd * 10 * k, wy3 + wr + 2 * k); fillP(g, '#e2443b'); }
+  // palms (in front of the tower), then the front garden
+  drawPalm(g, PORT ? tx - tw * .18 : tx - tw * .62, ground, 430 * k, (PORT ? 22 : -40) * k, 1);
+  drawPalm(g, PORT ? tx + tw * .42 : tx + tw * .2, ground, 370 * k, (PORT ? 34 : 28) * k, 2);
+  drawFountain(g, PORT ? 54 * k : tx - tw * 1.35, ground, .8 * k);
+  // hedges along the building + terracotta pot
+  for (let x = wingX - 10; x < W + 30; x += 46 * k) { const hh = (34 + Math.sin(x) * 4) * k; rr(g, x, ground - hh, 50 * k, hh + 4, 12 * k); const hg = g.createLinearGradient(0, ground - hh, 0, ground); hg.addColorStop(0, EXT.hedge); hg.addColorStop(1, EXT.hedgeD); g.fillStyle = hg; g.fill(); }
+  for (const bx of [tx - tw * .3, tx + tw * .45]) { circ(g, bx, ground - 18 * k, 24 * k); fillP(g, '#3a6a3a'); }
+  const px2 = tx + tw * .02; g.beginPath(); g.moveTo(px2 - 16 * k, ground - 34 * k); g.lineTo(px2 + 16 * k, ground - 34 * k); g.lineTo(px2 + 11 * k, ground); g.lineTo(px2 - 11 * k, ground); g.closePath(); fillP(g, '#c26a42'); for (let i = 0; i < 5; i++) { circ(g, px2 - 10 * k + i * 5 * k, ground - 40 * k - (i % 2) * 5 * k, 4 * k); fillP(g, '#e2443b'); }
+  // sidewalk + grass strip
+  g.fillStyle = '#b9b4ae'; g.fillRect(0, ground, W, H - ground); g.fillStyle = 'rgba(0,0,0,.12)'; for (let x = 0; x < W; x += 60 * k) g.fillRect(x, ground, 2, H - ground);
+  g.fillStyle = '#4f7a3e'; g.fillRect(0, ground + 26 * k, W, 18 * k);
+  // gentle snow flurry
+  g.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 26; i++) { const s1 = (i * .618) % 1, s2 = (i * .414 + .3) % 1; circ(g, (s1 * W + Math.sin(TT * .8 + i) * 16 + W) % W, (s2 * H + TT * (16 + s2 * 20)) % H, 1 + s1 * 1.4); g.fill(); }
 }
 
 
@@ -6323,6 +6334,23 @@ SCENES.swap = {
     this.st = { params: p, ph: 'ready', score: 0, moves: SS.MOVES, combo: 0, anim: null, sel: null, cur: [3, 3], pops: [], banner: 0, shuffleT: 0, hint: 0 };
     this.fill();
   },
+  // a tiny looping demo on the start screen: a finger swaps two bottles and the row of three pops
+  drawDemo(GA) {
+    const cs = Math.min(62, GA.w / 7), cx = GA.x + GA.w / 2, cy = GA.y + GA.h * .3 + 50 + 3 * 32 + cs * .55, T = (TT % 3) / 3;
+    const sw = clamp((T - .25) / .2, 0, 1), e = E.inOut(sw), popK = clamp((T - .5) / .15, 0, 1), gone = T > .65;
+    const cells = [[-1, 0, 0], [1, 0, 0], [0, 0, 2], [0, 1, 0]]; // [col, row, kind]: the middle gold swaps with the pink below it
+    rr(ctx, cx - cs * 1.75, cy - cs * .75, cs * 3.5, cs * 2.5, 16); fillP(ctx, 'rgba(20,14,34,.92)'); strokeP(ctx, 'rgba(255,211,77,.6)', 2);
+    cells.forEach(([c, r, k], i) => {
+      let x = cx + c * cs, y = cy + r * cs;
+      if (i === 2) y = cy + e * cs; if (i === 3) y = cy + cs - e * cs;
+      const inRow = (i === 0 || i === 1 || i === 3) && sw >= 1; if (inRow && gone) return;
+      const s = cs / 46 * (inRow ? 1 + popK * .35 : 1);
+      ctx.save(); ctx.globalAlpha = inRow ? 1 - popK * .6 : 1; ctx.translate(x, y); ctx.scale(s, s); drawSwapBottle(ctx, k, TT, false); ctx.restore();
+    });
+    if (gone) text(ctx, '+300!', cx, cy - 4 - (T - .65) * 40, { size: 14, font: PIXEL, weight: 400, color: '#ffd34d', stroke: '#2a1d2e', sw: 6 });
+    // the finger: taps the pink bottle, then the gold one above it
+    if (T < .5) { const fy = T < .22 ? cy + cs : cy, tap = Math.max(0, Math.sin(T * 40)) * 4; ctx.save(); ctx.translate(cx + cs * .35, fy + cs * .35 + tap); ctx.font = '600 ' + Math.round(cs * .7) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👆', 0, 0); ctx.restore(); }
+  },
   // ---- board ----
   rnd() { return Math.floor(Math.random() * SS.KINDS); },
   fill() {
@@ -6447,7 +6475,7 @@ SCENES.swap = {
       if (st.sel) { rr(ctx, v.ox + st.sel[1] * v.cs + 1, v.oy + st.sel[0] * v.cs + 1, v.cs - 2, v.cs - 2, 9); ctx.lineWidth = 3; ctx.strokeStyle = '#ffd34d'; ctx.stroke(); }
       if (FINE_POINTER && st.ph === 'play') { rr(ctx, v.ox + st.cur[1] * v.cs + 3, v.oy + st.cur[0] * v.cs + 3, v.cs - 6, v.cs - 6, 8); ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.stroke(); }
       // after a few idle seconds, nudge a possible move
-      let hint = null; if (st.hint > 6 && !st.anim) hint = this.hasMove();
+      let hint = null; if (st.hint > (st.score ? 5 : 2.5) && !st.anim) hint = this.hasMove();
       // bottles
       ctx.save(); rr(ctx, v.ox - 8, v.oy - 8, v.bw + 16, v.bw + 16, 14); ctx.clip();
       const an = st.anim;
@@ -6463,7 +6491,7 @@ SCENES.swap = {
       ctx.restore();
       // pop-ups
       for (const p of st.pops) { const [x, y] = this.cellXY(v, p.r, p.c), j = jiggle(p.t, p.c), k = E.back(clamp(p.t * 5, 0, 1)); ctx.save(); ctx.globalAlpha = 1 - Math.max(0, (p.t - (p.big ? .9 : .55)) / .35); ctx.translate(clamp(x, GA.x + 90, GA.x + GA.w - 90), y - p.t * 34); ctx.scale(k * j.sx, k * j.sy); ctx.rotate(j.rot); text(ctx, p.txt, 0, 0, { size: p.big ? 15 : 12, font: PIXEL, weight: 400, color: p.big ? '#ffd34d' : '#fff', stroke: '#2a1d2e', sw: 6 }); ctx.restore(); }
-      if (st.ph === 'ready') readyOverlay(GA, 'SHAMPOO SWAP', ['Swap bottles to make rows of 3.', 'Chain combos for big points!']);
+      if (st.ph === 'ready') { readyOverlay(GA, 'SHAMPOO SWAP', ['Tap a bottle, then the one next to it,', 'to swap them. Line up 3 the same!', SS.TARGET + ' points in ' + SS.MOVES + ' moves.']); this.drawDemo(GA); }
     });
     controls('swap');
     if (st.ph === 'over') arcadeEnd(st, 'swap', false, ['Out of moves!', 'Score: ' + st.score]);

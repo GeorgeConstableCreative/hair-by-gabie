@@ -3209,7 +3209,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v130';
+const GAME_VERSION = 'v131';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -4598,8 +4598,7 @@ SCENES.card = {
       ctx.save(); ctx.globalAlpha = a; ctx.translate(L.tx, L.ty); ctx.rotate(j); ctx.translate(-L.tx, -L.ty);
       let y = L.ty;
       text(ctx, 'Dear Gabie,', L.tx, y, { size: PORT ? 38 : 32, font: DISPLAY, italic: true, weight: 600, color: '#fff6e8' }); y += PORT ? 46 : 40;
-      const shown = Math.floor(clamp((t - 2.2) * 40, 0, CARD_MSG.length));
-      y += para(ctx, CARD_MSG.slice(0, shown), L.tx, y, L.tw, { size: PORT ? 22 : 18, color: '#e8ecfb', weight: 500, lh: PORT ? 30 : 25 }) + 18;
+      y += para(ctx, CARD_MSG, L.tx, y, L.tw, { size: PORT ? 22 : 18, color: '#e8ecfb', weight: 500, lh: PORT ? 30 : 25 }) + 18;
       if (t > 4.6) {
         ctx.globalAlpha = a * clamp((t - 4.6) * 3, 0, 1);
         text(ctx, 'with love from', L.tx, y, { size: PORT ? 24 : 20, font: DISPLAY, italic: true, weight: 600, color: '#c9c8ea' }); y += PORT ? 36 : 30;

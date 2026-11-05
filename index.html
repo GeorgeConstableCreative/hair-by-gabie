@@ -3209,7 +3209,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v128';
+const GAME_VERSION = 'v129';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -4017,7 +4017,7 @@ function drawGabieExterior(t) {
 /* =================== CHRISTMAS CARD: starring Mona =================== */
 const XMAS = '"Mountains of Christmas", "Fredoka", cursive';
 const BOLD = '"Luckiest Guy", "Fredoka", "Arial Black", sans-serif';
-const CARD_INTRO = 1.2;
+const CARD_INTRO = 1.4;
 const CARD_MSG = 'Thank you for all the laughs and the amazing styles all year long. You are absolutely fabulous!';
 // tap the MERRY CHRISTMAS letters to play Jingle Bells, one note per tap (traditional, public domain)
 const JINGLE = [76, 76, 76, 76, 76, 76, 76, 79, 72, 74, 76, 77, 77, 77, 77, 77, 76, 76, 76, 76, 74, 74, 76, 74, 79];
@@ -4520,7 +4520,6 @@ SCENES.card = {
     if (t > 1.4) this.stepMona(dt, this.layout());
     if (this.say) { this.say.t += dt; if (this.say.t > 2.4) this.say = null; }
     if (this.monaAct) { this.monaAct.t += dt; if (this.monaAct.t > this.monaAct.dur) this.monaAct = null; }
-    if (t > 3 && !this.say && Math.random() < dt * .12) this.say = { msg: pick(MONA_LINES), t: 0 };
     this.cardJ = Math.max(0, this.cardJ - dt);
   },
   down(x, y) {
@@ -4567,9 +4566,10 @@ SCENES.card = {
     // the grid of colour tiles
     for (let i = 0; i < 9; i++) {
       const tl = this.tiles[i], c = i % 3, r = Math.floor(i / 3), x = L.gx + c * L.tile, y = L.gy + r * L.tile, T = L.tile;
-      const t0 = .25 + i * .12, k = E.spring(clamp((t - t0) / .55, 0, 2)); if (t < t0) continue;
+      const t0 = .05 + i * .09; if (t < t0) continue;
       const fl = tl.flip > 0 ? Math.abs(Math.cos((1 - tl.flip / .5) * Math.PI)) : 1, hov = Math.sin(TT * 1.6 + i * .9) * .6;
-      ctx.save(); ctx.translate(x + T / 2, y + T / 2 + (1 - k) * -60); ctx.scale(fl * k, k); ctx.translate(-x - T / 2, -y - T / 2);
+      const pk = clamp((t - t0) / .65, 0, 1), pe = E.out(pk), B = cardBoxPos(), cx = x + T / 2, cy = y + T / 2, fs0 = lerp(.22, 1, pe) * (pk >= 1 ? 1 : 1 + Math.sin(pk * Math.PI) * .08);
+      ctx.save(); ctx.translate(lerp(B.x, cx, pe), lerp(B.y - B.h * .5, cy, pe) - Math.sin(pe * Math.PI) * T * .9); ctx.rotate((1 - pe) * (i % 2 ? 2.4 : -2.4)); ctx.scale(fl * fs0, fs0); ctx.translate(-cx, -cy);
       ctx.save(); ctx.beginPath(); ctx.rect(x - .5, y - .5, T + 1, T + 1); ctx.clip();
       ctx.fillStyle = tl.bg; ctx.fillRect(x - 1, y - 1, T + 2, T + 2);
       // the letter: heavy geometric sans, oversized so the tile crops it, just like the poster
@@ -4593,7 +4593,6 @@ SCENES.card = {
       else if (act) { o.pose = 'celebrate'; o.eyes = 'happy'; } else if (o.pose === 'sit' && (TT % 3.7) < .14) o.eyes = 'closed'; else if (o.pose === 'celebrate') o.eyes = 'happy';
       drawMona(ctx, M.x, M.y, M.s, o);
       if (this.monaAct && this.monaAct.kind === 'trumpet') this.drawTrumpet(M, this.monaAct.t);
-      if (this.say) speechBubble(this.say.msg, clamp(M.x, 110, W - 110), Math.max(SAFE.t + 96, M.top + 6), { t: this.say.t, size: 16 });
     }
     // the message, set like the poster's footer: quiet, centred, elegant
     if (t > 1.8) {
@@ -4618,7 +4617,7 @@ SCENES.card = {
     }
     if (t > 4.6) { ctx.globalAlpha = clamp((t - 4.6) * 3, 0, 1); text(ctx, 'CHRISTMAS 2026', W / 2, H - SAFE.b - 16, { size: PORT ? 13 : 11, weight: 600, color: '#3a4f82', track: 5 }); ctx.globalAlpha = 1; }
     soundBtn(); iconBtn('home', 34 + SAFE.l, 40 + SAFE.t, 22, glyphBack, () => go('title'));
-    if (sceneT < CARD_INTRO + .9) drawGiftWrapIntro(sceneT);
+    if (sceneT < CARD_INTRO + .9) drawCardBoxIntro(sceneT);
     if (this.p.declined && t < 6) { ctx.globalAlpha = clamp(3 - t / 2, 0, 1); pill('You declined the panic appointment… Mona says hi anyway.', W / 2, H - SAFE.b - 120, { size: 14 }); ctx.globalAlpha = 1; }
     if (t > 5.2) {
       ctx.globalAlpha = clamp((t - 5.2) * 2, 0, 1);
@@ -4630,6 +4629,56 @@ SCENES.card = {
     }
   }
 };
+
+/* the opening: a colour-block present drops onto the snow, wobbles, the lid pops off in a burst of light,
+   and the MERRY XMAS tiles fly out of it into the grid */
+function cardBoxPos() { const w = Math.min(W * .52, 300); return { x: W / 2, y: H * .56, w, h: w * .72 }; }
+function drawCardBoxIntro(t) {
+  const B = cardBoxPos(), OPEN = CARD_INTRO - .12, PAL9 = XTILES.map(x => x[1]), INK = '#1b1430';
+  if (t < .05) { drawCardBoxIntro.landed = false; drawCardBoxIntro.opened = false; }
+  if (t > .42 && !drawCardBoxIntro.landed) { drawCardBoxIntro.landed = true; sfx('stomp'); }
+  if (t > OPEN && !drawCardBoxIntro.opened) { drawCardBoxIntro.opened = true; sfx('pop'); sfx('whoosh'); for (let i = 0; i < 36; i++) spawn('confetti', B.x, B.y - B.h, 1, { vx: rand(-380, 380), vy: rand(-680, -260) }); }
+  const fade = 1 - clamp((t - OPEN - .15) / .6, 0, 1); if (fade <= 0) return;
+  const drop = 1 - E.out(clamp(t / .42, 0, 1)), land = t > .42 && t < .7 ? Math.sin((t - .42) / .28 * Math.PI) : 0;
+  const shake = t > .6 && t < OPEN ? Math.sin(t * 42) * .07 * clamp((t - .6) / (OPEN - .6), 0, 1) : 0, hopUp = t > .6 && t < OPEN ? Math.abs(Math.sin(t * 14)) * 10 * clamp((t - .6) / (OPEN - .6), 0, 1) : 0;
+  ctx.save(); ctx.globalAlpha = fade;
+  // soft shadow on the snow
+  ell(ctx, B.x, B.y + 6, B.w * .62 * (1 - drop * .6), 14); fillP(ctx, 'rgba(0,0,20,.35)');
+  // burst of light from the open box
+  if (t > OPEN) { const k = clamp((t - OPEN) / .5, 0, 1); ctx.save(); ctx.translate(B.x, B.y - B.h); ctx.rotate(TT * .8); ctx.globalAlpha = fade * (1 - k * .4);
+    for (let i = 0; i < 12; i++) { ctx.rotate(TAU / 12); const g = ctx.createLinearGradient(0, 0, 0, -B.w * 1.4); g.addColorStop(0, 'rgba(255,230,150,.75)'); g.addColorStop(1, 'rgba(255,230,150,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(0, -B.w * (i % 2 ? .9 : 1.4) * (.4 + k)); ctx.lineTo(10, 0); ctx.fill(); }
+    ctx.restore(); ctx.globalAlpha = fade; }
+  ctx.save(); ctx.translate(B.x, B.y - drop * H * .7 - hopUp); ctx.rotate(shake); ctx.scale(1 + land * .08, 1 - land * .08);
+  const bw = B.w, bh = B.h;
+  // the box: wrapped in a patchwork of the card's colour tiles
+  ctx.save(); rr(ctx, -bw / 2, -bh, bw, bh, 8); ctx.clip();
+  const cs = bw / 4; for (let r = 0; r * cs < bh + cs; r++) for (let c = 0; c < 4; c++) { ctx.fillStyle = PAL9[(r * 4 + c * 2 + r) % 9]; ctx.fillRect(-bw / 2 + c * cs, -bh + r * cs, cs + 1, cs + 1); }
+  ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(bw * .25, -bh, bw * .25, bh); ctx.restore();
+  rr(ctx, -bw / 2, -bh, bw, bh, 8); strokeP(ctx, INK, 4);
+  // ribbon
+  const rib = (x, y, w, h) => { ctx.fillStyle = '#ffd34d'; ctx.fillRect(x, y, w, h); ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.fillRect(x, y, Math.min(w, h) * .25 * (w < h ? 1 : 0) || w, w < h ? h : Math.min(w, h) * .25); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h); };
+  rib(-bw * .07, -bh, bw * .14, bh);
+  // the lid (on the box, then flying off)
+  const lk = t > OPEN ? (t - OPEN) : 0, lidY = -bh - lk * 900 + lk * lk * 900, lidX = lk * 260, lidR = lk * 5, lw = bw * 1.1, lh = bh * .26;
+  ctx.save(); ctx.translate(lidX, lidY); ctx.rotate(lidR);
+  ctx.save(); rr(ctx, -lw / 2, -lh, lw, lh, 8); ctx.clip(); const ls = lw / 5; for (let c = 0; c < 5; c++) { ctx.fillStyle = PAL9[(c * 3 + 1) % 9]; ctx.fillRect(-lw / 2 + c * ls, -lh, ls + 1, lh); } ctx.restore();
+  rr(ctx, -lw / 2, -lh, lw, lh, 8); strokeP(ctx, INK, 4); rib(-bw * .07, -lh, bw * .14, lh);
+  // a big bow
+  const wob = Math.sin(TT * 6) * .06;
+  ctx.save(); ctx.translate(0, -lh); ctx.rotate(wob);
+  for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(sd * bw * .42, -bw * .34, sd * bw * .5, bw * .06, 0, 0); ctx.fillStyle = sd < 0 ? '#ff4a55' : '#ff2d6e'; ctx.fill(); strokeP(ctx, INK, 3.5); ctx.beginPath(); ctx.moveTo(sd * 8, -4); ctx.quadraticCurveTo(sd * bw * .22, -bw * .18, sd * bw * .3, -bw * .06); strokeP(ctx, 'rgba(255,255,255,.45)', 3); }
+  for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(sd * bw * .18, bw * .2); ctx.lineTo(sd * bw * .1, bw * .17); ctx.lineTo(sd * bw * .05, bw * .24); ctx.closePath(); ctx.fillStyle = '#ff2d6e'; ctx.fill(); strokeP(ctx, INK, 3); }
+  circ(ctx, 0, 0, bw * .07); fillP(ctx, '#ffd34d'); strokeP(ctx, INK, 3.5);
+  // the gift tag
+  const sw = Math.sin(TT * 2.4) * .12; ctx.save(); ctx.rotate(.5 + sw); line(ctx, 0, 0, 0, bw * .32, INK, 2);
+  ctx.translate(0, bw * .32); ctx.rotate(-.4);
+  ctx.beginPath(); ctx.moveTo(-bw * .05, 0); ctx.lineTo(bw * .05, 0); ctx.lineTo(bw * .2, bw * .07); ctx.lineTo(bw * .2, bw * .22); ctx.lineTo(-bw * .2, bw * .22); ctx.lineTo(-bw * .2, bw * .07); ctx.closePath(); fillP(ctx, '#fbf8f3'); strokeP(ctx, INK, 2.5);
+  circ(ctx, 0, bw * .035, 3.5); fillP(ctx, INK);
+  text(ctx, 'For Gabie', 0, bw * .145, { size: bw * .085, font: SCRIPT, weight: 400, color: '#c8102e' }); ctx.restore();
+  ctx.restore(); ctx.restore();
+  ctx.restore();
+  ctx.restore();
+}
 
 
 /* =================== Arcade shared: frame, controls, sprites =================== */

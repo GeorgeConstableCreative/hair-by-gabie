@@ -617,8 +617,13 @@ const UI = {
 };
 const PAL = { ink: '#3a2a30', cream: '#fff7ef', pink: '#ff7eb6', pinkD: '#d94f8c', teal: '#2f8f8a', gold: '#d9b45a', grey: '#8f8781', dark: '#2a2226', wall: '#cdc2b6', red: '#d8433c', green: '#2f8a57' };
 const BTN_TONE = c => ({ [PAL.teal]: LUX.ink, [PAL.pinkD]: LUX.rose, '#d8433c': '#a3343a', '#e0283c': '#a3343a', '#2f8a57': LUX.forest, '#1f9a50': LUX.forest, '#c9822e': '#8a6a3a', '#7a6aa8': '#5a4e6e', '#3f7fbf': '#3e5a73' })[c] || c;
+function btnOff(id) { let hsh = 0; for (let i = 0; i < id.length; i++) hsh = (hsh * 31 + id.charCodeAt(i)) | 0; const r = ((hsh >>> 0) % 1000) / 1000; return { rot: (r - .5) * .05, dx: ((((hsh >>> 10) % 1000) / 1000) - .5) * 12 }; }
 function btn(id, x, y, w, h, label, cb, o) {
   o = o || {};
+  if (!o.straight) { const of = btnOff(id); ctx.save(); ctx.translate(x + w / 2 + of.dx, y + h / 2); ctx.rotate(of.rot); ctx.translate(-x - w / 2, -y - h / 2); btnInner(id, x, y, w, h, label, cb, o); ctx.restore(); return; }
+  btnInner(id, x, y, w, h, label, cb, o);
+}
+function btnInner(id, x, y, w, h, label, cb, o) {
   UI.button(id, x, y, w, h, () => {
     const r = o.r == null ? Math.min(h / 2, 14) : Math.min(o.r, h / 2), fill = BTN_TONE(o.color || PAL.pinkD), light = /rgba\(255|#fff|#faf5ee/i.test(fill);
     ctx.save(); ctx.shadowColor = 'rgba(20,10,14,.28)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6;
@@ -634,13 +639,13 @@ function btn(id, x, y, w, h, label, cb, o) {
    an ivory card with an ink outline, a coloured badge on the left, sentence-case text, a staggered pop-in and a press squash */
 const CHOICE_SEEN = {};
 function choiceBtn(id, x, y, w, h, label, cb, o) {
-  o = o || {}; const now = TT, seen = CHOICE_SEEN[id];
+  o = o || {}; { const of = btnOff(id + 'c'); x += of.dx * .6; o.tilt = of.rot * .7; } const now = TT, seen = CHOICE_SEEN[id];
   if (!seen || now - seen.last > .4) CHOICE_SEEN[id] = { t0: now + (o.i || 0) * .07, last: now }; else seen.last = now;
   const s = CHOICE_SEEN[id], tt = Math.max(0, now - s.t0), pop = E.back(clamp(tt * 4, 0, 1)), j = jiggle(tt, (o.i || 0) * 1.7 + .3);
   const acc = o.accent || LUX.rose, state = o.state;
   UI.button(id, x, y, w, h, (hot) => {
     const press = hot ? .97 : 1;
-    ctx.save(); ctx.globalAlpha *= clamp(tt * 5, 0, 1); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(j.rot * .5); ctx.scale(pop * j.sx * press, pop * j.sy * press); ctx.translate(-x - w / 2, -y - h / 2);
+    ctx.save(); ctx.globalAlpha *= clamp(tt * 5, 0, 1); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(j.rot * .5 + (o.tilt || 0)); ctx.scale(pop * j.sx * press, pop * j.sy * press); ctx.translate(-x - w / 2, -y - h / 2);
     const r = Math.min(18, h * .32), base = state === 'right' ? '#e3f4e8' : state === 'wrong' ? '#f6e3e1' : state === 'dim' ? '#efe9e2' : LUX.ivory;
     const edge = state === 'right' ? '#2f9a5e' : state === 'wrong' ? '#c0443c' : LUX.ink;
     ctx.save(); ctx.shadowColor = 'rgba(20,10,14,.22)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 5;
@@ -2172,7 +2177,7 @@ function cupMeter(x, y, frac) {
    inside the card. o: { t, stars, col, second:[label, cb], eyebrow } */
 function resultCard(title, lines, label, cb, o) {
   o = o || {};
-  const t = o.t || 1, won = o.col !== '#c9822e', acc = o.col || LUX.rose;
+  const t = o.t || 1, won = o.col !== '#c9822e', acc = won ? (o.col || LUX.rose) : '#f7b8d0', hd = won ? '#ffffff' : '#9e3d5a'; // game over: a soft light pink
   const stats = [], notes = [];
   lines.forEach(l => { const m = /^([^:]{2,14}):\s*(.+)$/.exec(l); if (m) stats.push([m[1], m[2]]); else notes.push(l); });
   const best = stats.find(s => /best/i.test(s[0])), score = stats.find(s => /score/i.test(s[0])), isNewBest = best && score && +score[1] > 0 && +score[1] >= +best[1];
@@ -2184,12 +2189,12 @@ function resultCard(title, lines, label, cb, o) {
   ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 12; rr(ctx, x, y, w, h, 30); fillP(ctx, LUX.ivory); ctx.restore();
   rr(ctx, x + 8, y + 8, w - 16, h - 16, 24); strokeP(ctx, 'rgba(201,164,106,.55)', 1.2);
   // coloured header band with a soft scallop
-  ctx.save(); rr(ctx, x, y, w, 96, 30); ctx.clip(); const hg = ctx.createLinearGradient(x, y, x + w, y + 96); hg.addColorStop(0, acc); hg.addColorStop(1, shade(acc, -.25)); ctx.fillStyle = hg; ctx.fillRect(x, y, w, 96);
+  ctx.save(); rr(ctx, x, y, w, 96, 30); ctx.clip(); const hg = ctx.createLinearGradient(x, y, x + w, y + 96); hg.addColorStop(0, acc); hg.addColorStop(1, won ? shade(acc, -.25) : '#f3a2c2'); ctx.fillStyle = hg; ctx.fillRect(x, y, w, 96);
   ctx.globalAlpha = .18; for (let i = 0; i < 9; i++) { circ(ctx, x + 20 + i * (w / 8), y + 18 + (i % 2) * 40, 22 + (i % 3) * 8); fillP(ctx, '#fff'); } ctx.globalAlpha = 1; ctx.restore();
   ctx.beginPath(); for (let i = 0; i <= 20; i++) { const xx = x + i / 20 * w; ctx.lineTo(xx, y + 96 + (i % 2 ? 6 : 0)); } ctx.lineTo(x + w, y + 104); ctx.lineTo(x, y + 104); ctx.closePath(); fillP(ctx, LUX.ivory);
-  if (k > .8) closeX('resx', x, y, w, o.onClose || cb, { dark: true });
-  text(ctx, (o.eyebrow || (won ? 'ROUND COMPLETE' : 'NICE TRY')), W / 2, y + 30, { size: 12, color: 'rgba(255,255,255,.85)', weight: 600, track: 3.5 });
-  { const tj = jiggle(t - .25, 3.1); ctx.save(); ctx.translate(W / 2, y + 66); ctx.scale(tj.sx, tj.sy); ctx.rotate(tj.rot); text(ctx, title, 0, 0, { size: 38, color: '#fff', weight: 600, font: DISPLAY, italic: true }); ctx.restore(); }
+  if (k > .8) closeX('resx', x, y, w, o.onClose || cb, { dark: won });
+  text(ctx, (o.eyebrow || (won ? 'ROUND COMPLETE' : 'NICE TRY')), W / 2, y + 30, { size: 12, color: won ? 'rgba(255,255,255,.85)' : 'rgba(158,61,90,.8)', weight: 600, track: 3.5 });
+  { const tj = jiggle(t - .25, 3.1); ctx.save(); ctx.translate(W / 2, y + 66); ctx.scale(tj.sx, tj.sy); ctx.rotate(tj.rot); text(ctx, title, 0, 0, { size: 38, color: hd, weight: 600, font: DISPLAY, italic: true }); ctx.restore(); }
   let yy = y + 128;
   if (sh) { for (let i = 0; i < 3; i++) { const on = i < o.stars, pk = on ? E.back(clamp((t - .4 - i * .25) * 3, 0, 1)) : 1; ctx.save(); ctx.translate(W / 2 + (i - 1) * 56, yy + 14); ctx.scale(pk, pk); drawStar(ctx, 0, 0, 25, OUT, 5); drawStar(ctx, 0, 1, 21, on ? '#ffd34d' : '#e3d9cc', 5); ctx.restore(); } yy += sh; }
   // stat tiles
@@ -2210,10 +2215,12 @@ function resultCard(title, lines, label, cb, o) {
   notes.forEach((l, i) => { para(ctx, l, W / 2, yy + 10 + i * 26, w - 60, { size: 17, color: '#5a4e52', weight: 500, lh: 22 }); }); yy += nh + (nh ? 12 : 0);
   ctx.restore();
   if (k > .8) {
-    btn('res1', x + 24, yy + 4, w - 48, 56, label, cb, { color: won ? LUX.ink : acc });
+    btn('res1', x + 24, yy + 4, w - 48, 56, label, cb, { color: won ? LUX.ink : '#d94f8c' });
     if (o.second) {
       const sy = yy + 72, sw = w - 48;
+      const of2 = btnOff('res2'); ctx.save(); ctx.translate(W / 2 + of2.dx, sy + 22); ctx.rotate(of2.rot); ctx.translate(-W / 2, -sy - 22);
       UI.button('res2', x + 24, sy, sw, 44, () => { rr(ctx, x + 24, sy, sw, 44, 22); strokeP(ctx, 'rgba(28,21,23,.25)', 1.6); text(ctx, o.second[0], W / 2, sy + 23, { size: 16, weight: 600, color: LUX.ink, track: 1.5 }); }, o.second[1]);
+      ctx.restore();
     }
   }
 }
@@ -3202,7 +3209,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v120';
+const GAME_VERSION = 'v121';
 
 /* =================== TITLE =================== */
 SCENES.title = {

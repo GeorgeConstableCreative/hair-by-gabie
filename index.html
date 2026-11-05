@@ -3209,7 +3209,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v131';
+const GAME_VERSION = 'v132';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -3241,15 +3241,19 @@ SCENES.title = {
     if (PORT) {
       // one neat column: every button the same width, with roomy gaps
       const items = [['new', 'Start game', () => go('opening'), 'felt'], ['lv', 'Jump to…', () => go('levels'), 'candy'], ['ar', 'Arcade', () => go('arcade', { next: null }), 'arcade']];
-      if (cont) items.push(['cont', contLabel, () => go(STAGES[reachedI]), 'holly']);
-      const bh = 62, gap = 34, bw2 = Math.min(W - 90, 440), x = W / 2 - bw2 / 2, total = items.length * bh + (items.length - 1) * gap;
+      // the Christmas card is always one tap away (on a fresh phone there's no saved progress yet)
+      const atCard = STAGES[reachedI] === 'card';
+      if (cont && !atCard) items.push(['cont', contLabel, () => go(STAGES[reachedI]), 'gift']);
+      items.push(['card', 'Christmas Card', () => go('card'), 'holly']);
+      const n = items.length, bh = n > 4 ? 56 : 62, gap = n > 4 ? 24 : 34, bw2 = Math.min(W - 90, 440), x = W / 2 - bw2 / 2, total = items.length * bh + (items.length - 1) * gap;
       const y0 = Math.max(bottom + 34, bottom + (EXTG.lampTop - 20 - bottom - total) * .5);
       items.forEach((it, i) => xmasBtn(it[0], x, y0 + i * (bh + gap), bw2, bh, it[1], it[2], it[3]));
     } else {
       // landscape: a 2 x 2 grid to the left of the storefront
       const cw = Math.min(290, (EXTG.sx - 40 - SAFE.l - g) / 2), gx0 = Math.max(SAFE.l + 20, EXTG.sx - 24 - cw * 2 - g), rows = cont ? 2 : 2, yb = H - SAFE.b - 74 - (H1 + g + H2);
-      xmasBtn('new', cont ? gx0 : gx0 + (cw + g) / 2, yb, cw, H1, 'Start game', () => go('opening'), 'felt');
+      xmasBtn('new', gx0, yb, cw, H1, 'Start game', () => go('opening'), 'felt');
       if (cont) xmasBtn('cont', gx0 + cw + g, yb, cw, H1, contLabel, () => go(STAGES[reachedI]), 'holly');
+      else xmasBtn('card', gx0 + cw + g, yb, cw, H1, 'Christmas Card', () => go('card'), 'holly');
       xmasBtn('lv', gx0, yb + H1 + g, cw, H2, 'Jump to…', () => go('levels'), 'candy');
       xmasBtn('ar', gx0 + cw + g, yb + H1 + g, cw, H2, 'Arcade', () => go('arcade', { next: null }), 'arcade');
     }
@@ -3691,7 +3695,7 @@ function drawSaveSheet(st, close) {
 })();
 
 /* =================== festive button skins =================== */
-const XBTN_OFF = { new: [0, -.015, 0], lv: [0, .02, 1], ar: [0, -.02, 2], cont: [0, .012, 3], again: [-4, -.05, 0], arc: [4, .045, 1] };
+const XBTN_OFF = { new: [0, -.015, 0], lv: [0, .02, 1], ar: [0, -.02, 2], cont: [0, .012, 3], card: [0, -.014, 3], again: [-4, -.05, 0], arc: [4, .045, 1] };
 function xmasBtn(id, x, y, w, h, label, cb, theme) {
   // each button sits slightly off-grid with its own tilt, pops in one after another, then gives a little jiggle now and then
   const off = XBTN_OFF[id] || [0, 0, 0]; x += off[0] * (PORT ? 1 : .6);

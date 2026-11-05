@@ -4,6 +4,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Hair By Gabie G">
 <meta name="theme-color" content="#2a2226">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="description" content="A Christmas game for Gabie: Samantha's hair grows while she sits in the chair.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3185,7 +3188,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v118';
+const GAME_VERSION = 'v119';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -3649,6 +3652,8 @@ function drawSaveSheet(st, close) {
 }
 /* an app icon for the Home Screen: drawn once, offered as apple-touch-icon and in a web manifest */
 (function addHomeIcon() {
+  // on the GitHub site the real Christmas icon files sit next to the page; elsewhere (e.g. a preview) draw a stand-in
+  if (/github\.io$/.test(location.hostname)) return;
   const make = () => { try {
     const c = document.createElement('canvas'); c.width = c.height = 180; const g = c.getContext('2d');
     const bg = g.createLinearGradient(0, 0, 0, 180); bg.addColorStop(0, '#3a1f3a'); bg.addColorStop(1, '#1a1016'); g.fillStyle = bg; g.fillRect(0, 0, 180, 180);

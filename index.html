@@ -3209,7 +3209,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v124';
+const GAME_VERSION = 'v125';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -4473,13 +4473,29 @@ SCENES.card = {
     return { tile, gw, gx, gy, tx, ty, tw };
   },
   tileAt(L, x, y) { const c = Math.floor((x - L.gx) / L.tile), r = Math.floor((y - L.gy) / L.tile); return c >= 0 && c < 3 && r >= 0 && r < 3 ? r * 3 + c : -1; },
-  monaSpot(L) { const s = L.tile / 230; return { x: L.gx + L.gw - L.tile * .45, y: L.gy + 2, s, top: L.gy - 210 * s }; },
+  monaSpot(L) { const p = this.mPos || { x: L.gx + 40, y: L.gy, face: 1, pose: 'sit' }; const s = L.tile / 330; return { x: p.x, y: p.y, s, top: p.y - 200 * s, face: p.face, pose: p.pose, gait: p.gait }; },
+  // the route: walk row 0 left→right, hop down, row 1 right→left, hop down, row 2 left→right, a big leap back to the top
+  monaRoute(L) {
+    const a = L.gx + L.tile * .3, b = L.gx + L.gw - L.tile * .3, y0 = L.gy, y1 = L.gy + L.tile, y2 = L.gy + L.tile * 2, v = 70;
+    const segs = [['sit', a, y0, a, y0, 1.4], ['walk', a, y0, b, y0], ['sit', b, y0, b, y0, .9], ['hop', b, y0, b, y1, .7], ['walk', b, y1, a, y1], ['sit', a, y1, a, y1, .9], ['hop', a, y1, a, y2, .7], ['walk', a, y2, b, y2], ['sit', b, y2, b, y2, 1.2], ['leap', b, y2, a, y0, 1.1]];
+    return segs.map(s => s[0] === 'walk' ? s.concat([Math.abs(s[3] - s[1]) / v]) : s);
+  },
+  stepMona(dt, L) {
+    const R = this.monaRoute(L), tot = R.reduce((q, s) => q + s[5], 0); this.mT = ((this.mT || 0) + dt) % tot;
+    let u = this.mT, seg = R[0]; for (const s of R) { if (u <= s[5]) { seg = s; break; } u -= s[5]; }
+    const k = clamp(u / seg[5], 0, 1), kind = seg[0], x = lerp(seg[1], seg[3], kind === 'walk' ? k : E.inOut(k)), yb = lerp(seg[2], seg[4], k);
+    const arc = kind === 'hop' ? Math.sin(k * Math.PI) * L.tile * .25 : kind === 'leap' ? Math.sin(k * Math.PI) * L.tile * 1.1 : 0;
+    const face = seg[3] !== seg[1] ? Math.sign(seg[3] - seg[1]) : (this.mPos ? this.mPos.face : 1);
+    if ((kind === 'hop' || kind === 'leap') && k > .97 && !this.mLand) { this.mLand = true; sfx('stomp'); } if (k < .5) this.mLand = false;
+    this.mPos = { x, y: yb - arc, face, pose: kind === 'walk' ? 'walk' : kind === 'sit' ? 'sit' : 'celebrate', gait: kind === 'walk' ? (x - L.gx) * .09 : 0 };
+  },
   update(dt) {
     const t = sceneT - CARD_INTRO;
     for (let i = 0; i < 9; i++) { const tl = this.tiles[i];
       if (tl.flip > 0) { tl.flip -= dt; if (tl.flip < .25 && !tl.swapped) { tl.swapped = true; tl.bg = tl.next[0]; tl.fg = tl.next[1]; } }
       if (t > .25 + i * .12 && this.landed <= i) { this.landed = i + 1; sfx(i % 3 === 2 ? 'ding' : 'pop'); } }
     if (this.landed === 9 && !this.cheered && t > 1.6) { this.cheered = true; sfx('win'); for (let i = 0; i < 30; i++) spawn('confetti', W / 2, this.layout().gy, 1, { vx: rand(-360, 360), vy: rand(-560, -160) }); }
+    if (t > 1.4) this.stepMona(dt, this.layout());
     if (this.say) { this.say.t += dt; if (this.say.t > 2.4) this.say = null; }
     if (this.monaAct) { this.monaAct.t += dt; if (this.monaAct.t > this.monaAct.dur) this.monaAct = null; }
     if (t > 3 && !this.say && Math.random() < dt * .12) this.say = { msg: pick(MONA_LINES), t: 0 };
@@ -4488,7 +4504,7 @@ SCENES.card = {
   down(x, y) {
     if (sceneT < CARD_INTRO + .6) return;
     const L = this.layout(), M = this.monaSpot(L);
-    if (Math.abs(x - M.x) < 80 * M.s * 1.6 && y > M.top && y < M.y + 4) { this.monaAct = { kind: 'celebrate', t: 0, dur: 1.1 }; this.say = { msg: pick(MONA_LINES), t: 0 }; sfx('meow'); spawn('heart', x, y, 6); return; }
+    if (Math.abs(x - M.x) < 90 * M.s && y > M.top && y < M.y + 8) { this.monaAct = { kind: 'celebrate', t: 0, dur: 1.1 }; this.say = { msg: pick(MONA_LINES), t: 0 }; sfx('meow'); spawn('heart', x, y, 6); return; }
     const i = this.tileAt(L, x, y);
     if (i >= 0) {
       const tl = this.tiles[i]; if (tl.flip > 0) return;
@@ -4515,20 +4531,21 @@ SCENES.card = {
       ctx.save(); ctx.beginPath(); ctx.rect(x - .5, y - .5, T + 1, T + 1); ctx.clip();
       ctx.fillStyle = tl.bg; ctx.fillRect(x - 1, y - 1, T + 2, T + 2);
       // the letter: heavy geometric sans, oversized so the tile crops it, just like the poster
-      const fs = T * 1.32; ctx.font = '700 ' + fs + 'px Jost, Futura, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-      const cw = ctx.measureText(tl.ch).width, sx = Math.min(1.25, T * 1.04 / cw);
-      ctx.save(); ctx.translate(x + T / 2, y + T + fs * .2 + hov); ctx.scale(sx, 1); ctx.fillStyle = tl.fg; ctx.fillText(tl.ch, 0, 0); ctx.restore();
+      ctx.font = '700 100px Jost, Futura, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      const mt = ctx.measureText(tl.ch), bl = mt.actualBoundingBoxLeft || 0, br = mt.actualBoundingBoxRight || mt.width, ba = mt.actualBoundingBoxAscent || 72, bd = mt.actualBoundingBoxDescent || 0;
+      const sc = Math.min(T * .74 / (ba + bd), T * .8 / (bl + br)); ctx.font = '700 ' + (100 * sc) + 'px Jost, Futura, sans-serif';
+      ctx.fillStyle = tl.fg; ctx.fillText(tl.ch, x + T / 2 - (br - bl) * sc / 2, y + T / 2 + (ba - bd) * sc / 2 + hov);
       ctx.restore(); ctx.restore();
     }
     // snow drifting softly across the poster
     for (let i = 0; i < 46; i++) { const s1 = (i * .618) % 1, s2 = (i * .414 + .3) % 1, x = (s1 * W + Math.sin(TT * .8 + i) * 16 + W) % W, y = (s2 * H + TT * (16 + s2 * 18)) % H; ctx.globalAlpha = .55; circ(ctx, x, y, 1.6 + s1 * 2.2); fillP(ctx, i % 5 ? '#ffffff' : '#c9d6e8'); ctx.globalAlpha = 1; }
     // Mona in her Santa hat, perched on top of the grid
     if (t > 1.4) {
-      const M = this.monaSpot(L), jt = t - 1.4, jump = jt < .5 ? Math.sin(jt / .5 * Math.PI) * 60 * M.s : 0;
-      const o = { pose: jt < 1 ? 'celebrate' : 'sit', outfit: 'santa', t: TT, face: 1, eyes: 'open' };
+      const M = this.monaSpot(L);
+      const o = { pose: M.pose, outfit: 'santa', t: TT, face: M.face, eyes: 'open', gait: M.gait };
       if (this.monaAct) { o.pose = 'celebrate'; o.eyes = 'happy'; } else if (o.pose === 'sit' && (TT % 3.7) < .14) o.eyes = 'closed'; else if (o.pose === 'celebrate') o.eyes = 'happy';
-      ctx.save(); ctx.translate(M.x, M.y - jump); drawMona(ctx, 0, 0, M.s, o); ctx.restore();
-      if (this.say) speechBubble(this.say.msg, M.x - L.tile * .9, Math.max(SAFE.t + 96, M.top + 10), { t: this.say.t, size: 16 });
+      drawMona(ctx, M.x, M.y, M.s, o);
+      if (this.say) speechBubble(this.say.msg, clamp(M.x, 110, W - 110), Math.max(SAFE.t + 96, M.top + 6), { t: this.say.t, size: 16 });
     }
     // the message, set like the poster's footer: quiet, centred, elegant
     if (t > 1.8) {
@@ -4544,16 +4561,17 @@ SCENES.card = {
         const nm = 'SAMANTHA, MONA & GEORGE', nfs = PORT ? 18 : 15; text(ctx, nm, L.tx, y, { size: nfs, weight: 600, color: '#33201a', track: 4 });
         // Mona's paw as a tiny red seal after the names
         const pw = textW(nm, nfs, 600, null, 4), px = L.tx + pw / 2 + 22; circ(ctx, px, y, 13); fillP(ctx, '#c8102e'); drawPaw(ctx, px, y + 1, .62, '#fbf8f3');
-        y += PORT ? 30 : 26; this.textBottom = y; text(ctx, 'CHRISTMAS 2026', L.tx, y, { size: PORT ? 13 : 11, weight: 500, color: '#8a7f78', track: 5 });
+        this.textBottom = y;
       }
       ctx.restore();
     }
+    if (t > 4.6) { ctx.globalAlpha = clamp((t - 4.6) * 3, 0, 1); text(ctx, 'CHRISTMAS 2026', W / 2, H - SAFE.b - 16, { size: PORT ? 13 : 11, weight: 500, color: '#8a7f78', track: 5 }); ctx.globalAlpha = 1; }
     soundBtn(); iconBtn('home', 34 + SAFE.l, 40 + SAFE.t, 22, glyphBack, () => go('title'));
     if (sceneT < CARD_INTRO + .9) drawGiftWrapIntro(sceneT);
     if (this.p.declined && t < 6) { ctx.globalAlpha = clamp(3 - t / 2, 0, 1); pill('You declined the panic appointment… Mona says hi anyway.', W / 2, H - SAFE.b - 120, { size: 14 }); ctx.globalAlpha = 1; }
     if (t > 5.2) {
       ctx.globalAlpha = clamp((t - 5.2) * 2, 0, 1);
-      const bw = Math.min(W - 60, 380) / 2 - 8, bh = PORT ? 56 : 48, by = PORT ? Math.min(H - SAFE.b - bh - 34, (this.textBottom || L.ty + 240) + 56) : H - SAFE.b - bh - 18, bx = L.tx;
+      const bw = Math.min(W - 60, 380) / 2 - 8, bh = PORT ? 56 : 48, by = PORT ? Math.min(H - SAFE.b - bh - 54, (this.textBottom || L.ty + 240) + 40) : H - SAFE.b - bh - 34, bx = L.tx;
       xmasBtn('again', bx - bw - 10, by - 6, bw, bh, 'Play again', () => go('title'), 'candy');
       xmasBtn('arc', bx + 10, by + 8, bw, bh, 'Arcade', () => go('arcade', { next: null }), 'arcade');
       ctx.globalAlpha = 1;

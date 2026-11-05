@@ -711,6 +711,15 @@ function iphoneCall(o) {
   rr(ctx, pcx - 50, py + ph - 14, 100, 5, 3); fillP(ctx, 'rgba(255,255,255,.7)');
   ctx.restore();
 }
+/* a round "×" in the top-right corner of every card, so any card can be closed */
+function closeX(id, cardX, cardY, cardW, cb, o) {
+  o = o || {}; const r = o.r || 20, x = cardX + cardW - r - (o.inset == null ? 14 : o.inset), y = cardY + r + (o.inset == null ? 14 : o.inset), dark = o.dark;
+  UI.button(id, x - r - 6, y - r - 6, (r + 6) * 2, (r + 6) * 2, () => {
+    circ(ctx, x, y, r); fillP(ctx, dark ? 'rgba(255,255,255,.16)' : 'rgba(28,21,23,.07)'); strokeP(ctx, dark ? 'rgba(255,255,255,.35)' : 'rgba(28,21,23,.18)', 1.5);
+    const a = r * .36; ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = dark ? '#ffffff' : LUX.ink; ctx.lineWidth = 2.8;
+    ctx.beginPath(); ctx.moveTo(x - a, y - a); ctx.lineTo(x + a, y + a); ctx.moveTo(x + a, y - a); ctx.lineTo(x - a, y + a); ctx.stroke(); ctx.restore();
+  }, cb);
+}
 const NAV_IDS = ['snd', 'pause', 'back', 'home', 'aback'];
 function iconBtn(id, x, y, r, glyph, cb, col) {
   if (NAV_IDS.includes(id) && !NAV.drawing) return; // the shared nav bar owns these corners
@@ -957,6 +966,7 @@ function drawHow(dt) {
   // the card sits a little off-centre and tilted, like a note tucked into the mirror
   const hj = jiggle(howCard.t, .9), cx0 = x + w / 2, cy0 = y + h / 2; ctx.save(); ctx.translate(cx0, cy0); ctx.scale(k * hj.sx, k * hj.sy); ctx.rotate(-.035 + hj.rot * .7); ctx.translate(-cx0, -cy0);
   panel(x, y, w, h, PAL.cream);
+  closeX('howx', x, y, w, () => { howCard = null; });
   text(ctx, howCard.title, W / 2, y + 50, { size: 40, color: LUX.ink, weight: 600, font: DISPLAY, italic: true });
   line(ctx, W / 2 - 34, y + 78, W / 2 + 34, y + 78, LUX.champagne, 1.4); circ(ctx, W / 2, y + 78, 2.4); fillP(ctx, LUX.champagne);
   if (howCard.sub) text(ctx, howCard.sub, W / 2, y + 104, { size: 16, color: LUX.taupe, weight: 500, track: .5 });
@@ -980,6 +990,7 @@ function drawPause() {
   const items = [['Resume', () => { paused = false; }, PAL.teal], ['Restart this screen', () => { paused = false; go(sceneName, (scene && scene.lastParams) || {}); }, PAL.pinkD], ['Skip to the next part', () => { paused = false; const t = skipTarget(); go(t[0], t[1]); }, '#c9822e'], ['Jump to any section', () => { paused = false; go('levels'); }, '#7a6aa8'], ['Home screen', () => { paused = false; go('title'); }, PAL.grey]];
   const bh = Math.min(52, (H - SAFE.t - SAFE.b - 300) / items.length - 12), w = Math.min(W - 48, 420), h = 196 + items.length * (bh + 12), x = W / 2 - w / 2, y = H / 2 - h / 2;
   panel(x, y, w, h);
+  closeX('pmx', x, y, w, () => { paused = false; });
   text(ctx, 'Paused', W / 2, y + 48, { size: 40, weight: 600, color: LUX.ink, font: DISPLAY, italic: true });
   items.forEach((it, i) => btn('pm' + i, x + 36, y + 86 + i * (bh + 12), w - 72, bh, it[0], it[1], { color: it[2], size: Math.min(20, bh * .4) }));
   // sound toggles: everything, music, sound effects
@@ -2055,11 +2066,12 @@ function chatDraw(st, dt) {
   const pk = E.back(clamp(b.t * 3, 0, 1));
   ctx.save(); ctx.translate(W / 2, py + ph); ctx.scale(1, pk); ctx.translate(-W / 2, -py - ph);
   panel(px, py, pw, ph, 'rgba(244,238,232,.98)', 26);
+  closeX('chatx', px, py, pw, () => { st.busy = null; st.gabSay = null; st.samExpr = 'smile'; if (b.onDone) b.onDone(); }, { r: 17, inset: 12 });
   // header: Samantha's little avatar + name, like a messages thread
   { const ax = px + 34, ay = py + 32; ctx.save(); circ(ctx, ax, ay, 18); ctx.clip(); fillP(ctx, '#e8c4c6'); drawSamPortrait(ctx, ax, ay + 6, .17, st.hs, { expr: 'smile' }); ctx.restore(); circ(ctx, ax, ay, 18); strokeP(ctx, '#fff', 2);
     text(ctx, 'Samantha', ax + 28, ay - 6, { size: 18, weight: 600, color: LUX.ink, align: 'left' });
     text(ctx, b.answered ? 'in the chair' : 'in the chair · waiting for your reply', ax + 28, ay + 14, { size: 13, weight: 500, color: LUX.taupe, align: 'left' });
-    if (!b.answered) { const left = clamp(1 - b.t / b.dur, 0, 1), bw = 90, bx = px + pw - bw - 22; rr(ctx, bx, ay - 4, bw, 8, 4); fillP(ctx, 'rgba(28,21,23,.1)'); rr(ctx, bx, ay - 4, Math.max(8, bw * left), 8, 4); fillP(ctx, left > .35 ? LUX.champagne : '#e8803c'); } }
+    if (!b.answered) { const left = clamp(1 - b.t / b.dur, 0, 1), bw = 80, bx = px + pw - bw - 64; rr(ctx, bx, ay - 4, bw, 8, 4); fillP(ctx, 'rgba(28,21,23,.1)'); rr(ctx, bx, ay - 4, Math.max(8, bw * left), 8, 4); fillP(ctx, left > .35 ? LUX.champagne : '#e8803c'); } }
   line(ctx, px + 16, py + 62, px + pw - 16, py + 62, 'rgba(28,21,23,.08)', 1.5);
   // the thread
   let y = py + 80; const maxW = pw * .78;
@@ -2128,6 +2140,7 @@ function quizDraw(st, dt) {
   ctx.restore();
   ctx.restore();
   if (k < .9) return;
+  closeX('tvx', x, y, w, () => { st.busy = null; if (b.onDone) b.onDone(b.right); }, { dark: true });
   const next = () => {
     b.n++; b.res = null;
     if (b.n >= 3) { st.busy = null; if (b.onDone) b.onDone(b.right); return; }
@@ -2174,6 +2187,7 @@ function resultCard(title, lines, label, cb, o) {
   ctx.save(); rr(ctx, x, y, w, 96, 30); ctx.clip(); const hg = ctx.createLinearGradient(x, y, x + w, y + 96); hg.addColorStop(0, acc); hg.addColorStop(1, shade(acc, -.25)); ctx.fillStyle = hg; ctx.fillRect(x, y, w, 96);
   ctx.globalAlpha = .18; for (let i = 0; i < 9; i++) { circ(ctx, x + 20 + i * (w / 8), y + 18 + (i % 2) * 40, 22 + (i % 3) * 8); fillP(ctx, '#fff'); } ctx.globalAlpha = 1; ctx.restore();
   ctx.beginPath(); for (let i = 0; i <= 20; i++) { const xx = x + i / 20 * w; ctx.lineTo(xx, y + 96 + (i % 2 ? 6 : 0)); } ctx.lineTo(x + w, y + 104); ctx.lineTo(x, y + 104); ctx.closePath(); fillP(ctx, LUX.ivory);
+  if (k > .8) closeX('resx', x, y, w, o.onClose || cb, { dark: true });
   text(ctx, (o.eyebrow || (won ? 'ROUND COMPLETE' : 'NICE TRY')), W / 2, y + 30, { size: 12, color: 'rgba(255,255,255,.85)', weight: 600, track: 3.5 });
   { const tj = jiggle(t - .25, 3.1); ctx.save(); ctx.translate(W / 2, y + 66); ctx.scale(tj.sx, tj.sy); ctx.rotate(tj.rot); text(ctx, title, 0, 0, { size: 38, color: '#fff', weight: 600, font: DISPLAY, italic: true }); ctx.restore(); }
   let yy = y + 128;
@@ -3188,7 +3202,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v119';
+const GAME_VERSION = 'v120';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -3635,6 +3649,7 @@ function drawSaveSheet(st, close) {
   const h = 150 + steps.length * 82 + (tip ? 50 : 0) + 74, x = W / 2 - w / 2, y = H / 2 - h / 2, k = E.spring(Math.min(1, st.t * 2.2));
   ctx.save(); ctx.translate(W / 2, H / 2); ctx.scale(k, k); ctx.translate(-W / 2, -H / 2);
   panel(x, y, w, h, '#fff7ef', 26);
+  closeX('savex', x, y, w, close);
   glyphShare(W / 2, y + 42, 1.4);
   text(ctx, 'Save to your Home Screen', W / 2, y + 86, { size: 26, color: PAL.pinkD, weight: 700 });
   text(ctx, 'Then Gabie\'s game opens full screen, like an app.', W / 2, y + 118, { size: 15, color: PAL.grey, weight: 500 });

@@ -2927,12 +2927,12 @@ SCENES.dry = {
     this.lastParams = p; reach('dry'); playTrack('salon');
     const hs = newHair(save.style); for (let i = 0; i < HN; i++) { hs.len[i] += rand(2, 8); hs.wet[i] = 1; }
     hs.blue = save.blue ? 1 : 0; hs.wind = Array(HN).fill(0);
-    this.st = { hs, phase: 'play', declined: 0, answered: 0, call: null, callT: 6, gabOut: { ang: .5 }, finger: null, hoverF: false, poof: 0, samSay: null, gabSay: null, resT: 0, autoX: 0, introT: 0, heat: 1, hot: 0, burns: 0, goodT: 0, dryT: 0, brrT: 0, deck: shuffle(DRY_CALLERS) };
+    this.st = { hs, phase: 'play', declined: 0, answered: 0, call: null, callT: 4, gabOut: { ang: .5 }, finger: null, hoverF: false, poof: 0, samSay: null, gabSay: null, resT: 0, autoX: 0, introT: 0, heat: 1, hot: 0, burns: 0, goodT: 0, dryT: 0, brrT: 0, deck: shuffle(DRY_CALLERS) };
     camSet(300, PORT ? 500 : 455, 1, true);
     showHow('The Blow-dry', ['Pick the heat: Hot when wet, Warm when damp, Cool to finish.', 'Phone ringing? Tap Decline. Say no to 3 calls to finish.'], null, { go: 'Start drying' });
   },
   // calm pacing: a good long spell of drying between calls; quicker only once the hair is already dry
-  gap() { return (this.st.dry || 0) >= .97 ? rand(2, 3) : rand(8, 11); },
+  gap() { return (this.st.dry || 0) >= .97 ? rand(1.5, 2.2) : rand(5, 7); },
   say(msg) { this.st.samSay = { msg, t: 0 }; },
   // the heat the hair wants right now: soaking = Hot, damp = Warm, nearly dry = a Cool shot to set it
   bestHeat() { const d = this.st.dry || 0; return d < .45 ? 2 : d < .8 ? 1 : 0; },
@@ -2990,7 +2990,7 @@ SCENES.dry = {
     }
     // drying + smoothing where the dryer is (only while Gabie's paying attention)
     if (!talking) {
-      const HR = [.14, .3, .55], best = this.bestHeat(), down = (st.fdy || 0) > .4, rate = st.finger ? HR[st.heat] * (down ? 1.4 : 1) : 0; st.fdy = (st.fdy || 0) * Math.exp(-6 * dt);
+      const HR = [.2, .42, .75], best = this.bestHeat(), down = (st.fdy || 0) > .4, rate = st.finger ? HR[st.heat] * (down ? 1.4 : 1) : 0; st.fdy = (st.fdy || 0) * Math.exp(-6 * dt);
       if (st.finger) {
         st.dryT += dt; if (st.heat === best) st.goodT += dt;
         // too hot on hair that's already nearly dry: it scorches
@@ -3016,7 +3016,7 @@ SCENES.dry = {
     if (!st.call && st.declined < 3) { st.callT -= dt; if (st.callT <= 0) this.ring(); }
     else if (st.call) { // (after the 3rd decline there's no call left: nothing to update, no crash)
       const c = st.call; c.t += dt;
-      if (c.state === 'ringing') { if (Math.floor(c.t * 1.2) !== Math.floor((c.t - dt) * 1.2)) sfx('ring'); if (c.t > 9) { st.call = null; st.callT = this.gap(); st.gabSay = { msg: 'Eh, they\'ll call back.', t: 0 }; } }
+      if (c.state === 'ringing') { if (Math.floor(c.t * 1.2) !== Math.floor((c.t - dt) * 1.2)) sfx('ring'); if (c.t > 7) { st.call = null; st.callT = this.gap(); st.gabSay = { msg: 'Eh, they\'ll call back.', t: 0 }; } }
       else if (c.state === 'talking') {
         if (c.t > 1.9 && c.line === 0) { c.line = 1; st.gabSay = { msg: c.who[1][1], t: 0 }; }
         if (c.t > 3.8) { st.call = null; st.blowSaid = false; st.callT = this.gap(); st.gabSay = { msg: pick(['Mamma mia, your hair!', 'Oops! Let me fix that.', 'Sorry, sorry!']), t: 0 }; }
@@ -3218,7 +3218,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v134';
+const GAME_VERSION = 'v135';
 
 /* =================== TITLE =================== */
 SCENES.title = {

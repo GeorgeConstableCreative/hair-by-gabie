@@ -3209,7 +3209,7 @@ SCENES.dry = {
   }
 };
 
-const GAME_VERSION = 'v127';
+const GAME_VERSION = 'v128';
 
 /* =================== TITLE =================== */
 SCENES.title = {
@@ -4476,30 +4476,25 @@ SCENES.card = {
     }
   },
   layout() {
-    const tile = PORT ? Math.min((W - 64) / 3, (H - SAFE.t - SAFE.b - 520) / 3, 180) : Math.min((H - SAFE.t - SAFE.b - 150) / 3, W * .15);
-    const gw = tile * 3, gx = PORT ? W / 2 - gw / 2 : W * .3 - gw / 2, total = gw + 54 + 250 + 120, gy = SAFE.t + (PORT ? Math.max(150, (H - SAFE.t - SAFE.b - total) / 2 + 70) : 108);
+    const tile = PORT ? Math.min((W - 64) / 3, (H - SAFE.t - SAFE.b - (H < 1150 ? 640 : 520)) / 3, 180) : Math.min((H - SAFE.t - SAFE.b - 150) / 3, W * .15);
+    const gw = tile * 3, gx = PORT ? W / 2 - gw / 2 : W * .3 - gw / 2, total = gw + 54 + 250 + 120, gy = SAFE.t + (PORT ? Math.max(H < 1150 ? 118 : 150, (H - SAFE.t - SAFE.b - total) / 2 + 70) : 108);
     const tx = PORT ? W / 2 : W * .73, ty = PORT ? gy + gw + 54 : SAFE.t + 120, tw = PORT ? Math.min(W - 60, 500) : W * .4;
     return { tile, gw, gx, gy, tx, ty, tw };
   },
   tileAt(L, x, y) { const c = Math.floor((x - L.gx) / L.tile), r = Math.floor((y - L.gy) / L.tile); return c >= 0 && c < 3 && r >= 0 && r < 3 ? r * 3 + c : -1; },
-  monaSpot(L) { const p = this.mPos || { x: L.gx + 40, y: L.gy, face: 1, pose: 'sit' }; const s = L.tile / 290; return { x: p.x, y: p.y, s, top: p.y - 200 * s, face: p.face, pose: p.pose, gait: p.gait }; },
+  monaSpot(L) { const p = this.mPos || { x: 60, y: H - SAFE.b - 44, face: 1, pose: 'sit' }; const s = PORT ? .46 : .36; return { x: p.x, y: p.y, s, top: p.y - 200 * s, face: p.face, pose: p.pose, gait: p.gait }; },
   // where the top of a letter is right now (it moves when a letter is knocked)
   letterTop(L, i) { const tl = this.tiles[i], c = i % 3, r = Math.floor(i / 3); return { x: L.gx + c * L.tile + L.tile / 2 + tl.lx, y: L.gy + r * L.tile + L.tile / 2 + tl.ly - tl.hh * Math.cos(tl.rot) }; },
-  // the climb: letter to letter in a zig-zag, M-E-R, then X-Y-R, then M-A-S, then a big leap back up to the first M
+  // a casual stroll along the snowy ground: walk across, pause and sit for a look around, turn, walk back
   stepMona(dt, L) {
-    const ORDER = [0, 1, 2, 5, 4, 3, 6, 7, 8], HOP = .6, STAY = 1.3, n = ORDER.length, per = HOP + STAY, tot = n * per + .4;
+    const gy = H - SAFE.b - 44, x0 = SAFE.l + 50, x1 = W - SAFE.r - 50, v = 38, walkT = (x1 - x0) / v, sitT = 2.4, tot = 2 * (walkT + sitT);
     this.mT = ((this.mT || 0) + (this.monaAct ? 0 : dt)) % tot;
-    const step = Math.min(n - 1, Math.floor(this.mT / per)), u = this.mT - step * per, cur = ORDER[step], prev = ORDER[(step + n - 1) % n];
-    const P1 = this.letterTop(L, cur), P0 = this.letterTop(L, prev);
-    let x, y, pose = 'sit', face = this.mPos ? this.mPos.face : 1;
-    if (u < HOP) { // jumping across (the leap from S back to M is a big one)
-      const k = u / HOP, big = step === 0, h = (big ? 1.4 : .45) * L.tile + Math.max(0, P0.y - P1.y) * .5;
-      x = lerp(P0.x, P1.x, E.inOut(k)); y = lerp(P0.y, P1.y, k) - Math.sin(k * Math.PI) * h; pose = 'celebrate'; if (P1.x !== P0.x) face = Math.sign(P1.x - P0.x);
-      if (k > .95 && !this.mLand) { this.mLand = true; sfx('stomp'); this.knock(cur, face, .25); }
-    } else { // standing on the letter, pacing a little across its top
-      this.mLand = false; const k = (u - HOP) / STAY, w = this.tiles[cur].hw * .5; x = P1.x + Math.sin(k * Math.PI * 2) * w; y = P1.y; pose = k < .85 ? 'walk' : 'sit'; face = Math.cos(k * Math.PI * 2) >= 0 ? 1 : -1;
-    }
-    this.mPos = { x, y, face, pose, gait: pose === 'walk' ? x * .09 : 0, on: cur };
+    let u = this.mT, x, face, pose;
+    if (u < walkT) { x = lerp(x0, x1, u / walkT); face = 1; pose = 'walk'; }
+    else if ((u -= walkT) < sitT) { x = x1; face = u < sitT * .6 ? 1 : -1; pose = 'sit'; }
+    else if ((u -= sitT) < walkT) { x = lerp(x1, x0, u / walkT); face = -1; pose = 'walk'; }
+    else { u -= walkT; x = x0; face = u < sitT * .6 ? -1 : 1; pose = 'sit'; }
+    this.mPos = { x, y: gy, face, pose, gait: pose === 'walk' ? x * .09 : 0 };
   },
   // knock a letter: it flies off and ricochets around the walls of its own box before settling back
   knock(i, dir, power) { const tl = this.tiles[i]; if (!tl) return; const p = power || 1; tl.vx += dir * rand(260, 420) * p; tl.vy += rand(-380, -200) * p; tl.vr += dir * rand(5, 9) * p; },
@@ -4519,15 +4514,8 @@ SCENES.card = {
     // Mona's trumpet fanfare: each note makes a letter jump
     for (const n of this.tune) if (!n.done && sceneT >= n.at) { n.done = true; this.knock(Math.floor(Math.random() * 9), Math.random() < .5 ? -1 : 1, .5); }
     this.tune = this.tune.filter(n => !n.done);
-    // now and then Mona bats the letter she's standing on
-    if (t > 3 && !this.monaAct && this.mPos && t > this.nextSwat) {
-      const on = this.mPos.on != null ? this.mPos.on : 0, nb = [on - 1, on + 1, on - 3, on + 3].filter(j => j >= 0 && j < 9 && (Math.abs((j % 3) - (on % 3)) <= 1)), tgt = pick(nb.length ? nb : [on]);
-      this.nextSwat = t + rand(2.2, 3.6); this.monaAct = { kind: 'swat', t: 0, dur: .55 };
-      setTimeout(() => { this.knock(tgt, (tgt % 3) >= (on % 3) ? 1 : -1, 1); sfx('boing'); }, 220);
-    }
-    for (let i = 0; i < 9; i++) { const tl = this.tiles[i];
-      if (tl.flip > 0) { tl.flip -= dt; if (tl.flip < .25 && !tl.swapped) { tl.swapped = true; tl.bg = tl.next[0]; tl.fg = tl.next[1]; } }
-      if (t > .25 + i * .12 && this.landed <= i) { this.landed = i + 1; sfx(i % 3 === 2 ? 'ding' : 'pop'); } }
+    // the letters keep dancing: every moment or so one of them takes a little hop and bounces around its box
+    if (t > 2.2 && t > (this.nextBop || 0)) { this.nextBop = t + rand(.45, .9); this.knock(Math.floor(Math.random() * 9), Math.random() < .5 ? -1 : 1, rand(.35, .7)); }
     if (this.landed === 9 && !this.cheered && t > 1.6) { this.cheered = true; sfx('win'); for (let i = 0; i < 30; i++) spawn('confetti', W / 2, this.layout().gy, 1, { vx: rand(-360, 360), vy: rand(-560, -160) }); }
     if (t > 1.4) this.stepMona(dt, this.layout());
     if (this.say) { this.say.t += dt; if (this.say.t > 2.4) this.say = null; }
@@ -4589,7 +4577,7 @@ SCENES.card = {
       const mt = ctx.measureText(tl.ch), bl = mt.actualBoundingBoxLeft || 0, br = mt.actualBoundingBoxRight || mt.width, ba = mt.actualBoundingBoxAscent || 72, bd = mt.actualBoundingBoxDescent || 0;
       const sc = Math.min(T * .64 / (ba + bd), T * .68 / (bl + br)); ctx.font = '700 ' + (100 * sc) + 'px Jost, Futura, sans-serif';
       tl.hw = (bl + br) * sc / 2; tl.hh = (ba + bd) * sc / 2;
-      ctx.save(); ctx.translate(x + T / 2 + tl.lx, y + T / 2 + tl.ly + hov); ctx.rotate(tl.rot);
+      ctx.save(); ctx.translate(x + T / 2 + tl.lx, y + T / 2 + tl.ly + hov * 4); ctx.rotate(tl.rot + Math.sin(TT * 1.3 + i * 1.7) * .06);
       ctx.fillStyle = tl.fg; ctx.fillText(tl.ch, -(br - bl) * sc / 2, (ba - bd) * sc / 2); ctx.restore();
       ctx.restore(); ctx.restore();
     }
